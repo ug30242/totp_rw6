@@ -4,10 +4,10 @@
 
 ## 설치와 사용
 
-[릴리스](https://github.com/ug30242/totp_rw6/releases/latest)에서 같은 버전의 APK와 RPK를 설치하세요. 현재 버전은 **1.3.0 / versionCode 8**입니다.
+[릴리스](https://github.com/ug30242/totp_rw6/releases/latest)에서 같은 버전의 APK와 RPK를 설치하세요. 현재 버전은 **1.3.1 / versionCode 9**입니다.
 
-1. `com.vela.rw6totp.release.1.3.0.rpk`를 Notify for Xiaomi의 펌웨어 업데이트 → 타사 앱(RPK)에서 업데이트합니다. 기존 앱을 삭제할 필요가 없습니다.
-2. Android 8.0 이상에 `rw6-totp-android-1.3.0.apk`를 설치합니다. 워치는 Mi Fitness / 중국판 운동건강에 연결해야 합니다. Notify 단독 연결은 XMS 통신을 제공하지 않습니다.
+1. `com.vela.rw6totp.release.1.3.1.rpk`를 Notify for Xiaomi의 펌웨어 업데이트 → 타사 앱(RPK)에서 업데이트합니다. 기존 앱을 삭제할 필요가 없습니다.
+2. Android 8.0 이상에 `rw6-totp-android-1.3.1.apk`를 설치합니다. 워치는 Mi Fitness / 중국판 운동건강에 연결해야 합니다. Notify 단독 연결은 XMS 통신을 제공하지 않습니다.
 3. Android의 **계정 추가**에서 이름·Base32 인증키·해시·자리수·주기를 저장합니다. 기존 계정은 목록에서 선택하고 **수정**합니다.
 4. 워치의 TOTP → **+ Phone**을 열고 Android의 **동기화**를 누릅니다. 필요한 최초 Mi Fitness 기기 통신 권한을 허용하세요. 워치 수신 화면이 닫혔다면 응답 확인 후 자동 실행을 시도합니다.
 5. 완료 후 워치에서 Close를 눌러 OTP를 확인합니다. 원본 인증기와 설정 및 시간이 같아야 합니다.
@@ -16,13 +16,13 @@
 
 Android 화면은 **RW6 TOTP 동기화**, TOTP 목록과 **계정 추가 / 수정 / 동기화** 버튼으로 구성했습니다. QR 스캔·이미지/URI 가져오기·웹 도우미·카메라 권한 및 관련 실행 라이브러리는 제거했습니다. 과거 릴리스 파일은 이력과 회귀 검사를 위해 보존합니다.
 
-## 1.3.0 응답 유실 수정
+## 1.3.1 워치 응답 오류 1006 수정
 
-1.2.1은 동기화 시작 시 이미 열린 수신 화면도 다시 실행했고, 이전 페이지가 늦게 종료되면 동일한 interconnect 인스턴스의 새 수신 핸들러를 덮어쓸 수 있었습니다. 기존 서명된 RPK를 대상으로 페이지 실행·종료가 겹치는 상황에서 준비 응답이 사라지는 것을 재현했습니다.
+워치에 `Phone data received`가 표시되지만 `Reply failed (1006)`으로 끝나는 보고를 바탕으로 Android 수신 연결 절차를 점검했습니다. XMS 서비스의 메시지 리스너만 등록하고, 공식 SDK가 사용하는 `registerServiceConnectedListener` 호출을 빠뜨린 결함을 수정했습니다. 공식 SDK의 Binder 슬롯 1 등록 확인 신호도 처리합니다. 이 등록을 노드 조회·메시지 리스너 등록·동기화보다 먼저 완료하며, 실패하면 준비 완료로 처리하지 않습니다.
 
-현재 화면에 먼저 hello를 보내고, 응답이 없을 때만 원격 실행을 시도합니다. 종료되는 페이지는 자신의 수신 처리만 비활성화하며 새 핸들러를 지우지 않습니다. 원본 JSON과 data 래퍼, UTF-8 데이터 형식을 경계 검사 후 처리합니다. 워치의 수신/응답 상태와 응답 전송 오류도 표시합니다. SDK 연결 성공만으로 저장 성공을 판단하지 않으며 실제 저장 응답을 확인합니다.
+새 Android 테스트는 실제 생성 AIDL Proxy/Stub와 Parcel을 통과해 등록 → 준비 응답 → 저장 응답을 검사합니다. 등록 호출을 제거하거나 등록 확인 신호 처리를 제거하면 각각 회귀 테스트가 실패합니다. [분석과 통신 규격 근거](docs/xms-reply-1006.md)를 기록했습니다.
 
-이 결함의 자동 재현·수정 검사는 실기기의 모든 통신 원인을 확정하지는 않습니다. **중국판 펌웨어 3.100.043에서 실제 Bluetooth 왕복은 사용자 기기 확인이 필요합니다.**
+1.3.0의 페이지 종료 시 새 수신 핸들러 보존, 열린 수신 화면에 먼저 준비 요청하기, JSON/data/UTF-8 해제, 워치 수신·응답 진단도 유지합니다. **중국판 펌웨어 3.100.043에서 실제 Bluetooth 왕복은 사용자 기기 확인이 필요합니다.**
 
 ## 데이터 보관
 
@@ -37,8 +37,8 @@ Node.js 24, JDK 17/21, Android SDK 35 및 Build-Tools 35.0.0을 사용합니다.
 ```sh
 npm ci
 npm run build
-npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.3.0.rpk
-npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.3.0.rpk
+npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.3.1.rpk
+npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.3.1.rpk
 npm test
 cd android
 ./gradlew --no-daemon :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
@@ -46,7 +46,7 @@ cd ..
 npm run test:interop
 ```
 
-Java 테스트는 계정 검증·암호화·준비 확인·저장 응답·타임아웃과 Android 화면 실행을 검사합니다. `test:interop`는 컴파일된 Android 코드의 실제 생성 패킷을 워치 저장 모듈로 보내 RFC OTP와 갱신을 확인합니다. RPK 검사는 Node 모듈 전역 없이 컴파일된 화면과 페이지 종료가 겹치는 경우의 수신 동작을 실행합니다. 실제 기기의 Mi Fitness 버전·Bluetooth·Keystore·터치·화면 배치는 별도 확인 대상입니다.
+Java 테스트는 계정 검증·암호화·준비 확인·저장 응답·타임아웃·Android 화면 실행과 XMS 네이티브 Binder 등록/왕복을 검사합니다. `test:interop`는 컴파일된 Android 코드의 실제 생성 패킷을 워치 저장 모듈로 보내 RFC OTP와 갱신을 확인합니다. RPK 검사는 Node 모듈 전역 없이 컴파일된 화면과 페이지 종료가 겹치는 경우의 수신 동작을 실행합니다. 실제 기기의 Mi Fitness 버전·Bluetooth·Keystore·터치·화면 배치는 별도 확인 대상입니다.
 
 **루트 package.json에 `type: module`을 추가하지 마세요.** aiot-toolkit의 CommonJS 변환과 충돌해 검은 화면이 재발합니다. Node 24 MODULE_TYPELESS_PACKAGE_JSON 경고는 예상된 동작입니다. CLI에는 쓰기 가능한 `$HOME/.vela/vvd`가 필요합니다. aiot는 체크아웃 전체를 임시 복사·이동하므로 빌드 중 파일 편집이나 Android 빌드를 겹쳐 실행하지 마세요.
 

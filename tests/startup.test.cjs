@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {smokeRpk}=require('../scripts/smoke-rpk.cjs');
-const current=()=>fs.readFileSync('releases/v1.3.0/com.vela.rw6totp.release.1.3.0.rpk');
+const current=()=>{const {version}=require('../package.json');return fs.readFileSync(`releases/v${version}/com.vela.rw6totp.release.${version}.rpk`);};
 test('previous release loses its receiver when an old page is destroyed after a new page opens',async()=>{
   await assert.rejects(smokeRpk(fs.readFileSync('releases/v1.2.1/com.vela.rw6totp.release.1.2.1.rpk'),{overlapReceivePages:true}),/handshake/);
 });

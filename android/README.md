@@ -6,6 +6,8 @@ Android 8.0 이상에서 계정을 직접 추가·수정하고 동기화합니�
 
 Mi Fitness / 중국판 운동건강의 `com.xiaomi.wearable.XMS_WEARABLE_SERVICE`에 연결합니다. Notify는 RPK 설치에 사용할 수 있지만 XMS 서비스를 대신하지 않습니다. 서명과 패키지명을 기존 워치 앱과 일치시켜야 합니다.
 
+서비스 연결 시 `registerServiceConnectedListener`로 살아 있는 Binder를 먼저 등록합니다. XMS 1.4의 Binder 슬롯 1 등록 확인 신호를 처리하며, 서비스 등록 호출 후 노드 조회·수신 리스너 등록을 진행합니다. 이 호출을 누락하면 휴대폰 전송만으로는 워치의 응답 경로를 확인할 수 없습니다. 등록 실패 시 준비 완료로 처리하지 않습니다. [1006 분석](../docs/xms-reply-1006.md)과 `XmsClientTest`의 AIDL/Parcel 왕복 검사를 참고하세요.
+
 SyncSession은 현재 워치 화면에 먼저 `rw6-totp-hello`를 보냅니다. 응답이 없을 때만 `/receive` 실행을 요청합니다. 준비 응답 후 계정을 하나씩 보내고 저장소 성공 이후의 `saved` 응답을 확인합니다. data 객체/문자열 래퍼도 제한된 깊이와 길이 내에서 해제합니다. 저장 요청 실패를 성공으로 처리하지 않습니다. 응답 확인용 초기 probe 실패는 재시도·원격 실행을 막지 않습니다.
 
 워치 수신 콜백은 페이지별 수명을 갖습니다. 이전 페이지의 종료가 새 페이지가 등록한 singleton 수신 핸들러를 덮어쓰지 않습니다. 자동 실행 및 실제 Mi Fitness와 펌웨어의 메시지 전달은 실기기 검증 대상입니다.
@@ -24,7 +26,7 @@ cd android
 cd ..
 npm run test:interop
 bash scripts/sign-apk.sh
-npm run verify:apk -- dist/rw6-totp-android-1.3.0.apk
+npm run verify:apk -- dist/rw6-totp-android-1.3.1.apk
 ```
 
 `app-release-unsigned.apk`는 설치 파일이 아닙니다. 서명 스크립트는 기존 PEM 개인키·인증서로 임시 PKCS12를 만들고 종료 시 지웁니다. 비밀 정보를 출력·커밋하거나 대체 키를 생성하지 마세요. 공개 인증서와 APK 서명을 비교합니다.

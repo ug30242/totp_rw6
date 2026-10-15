@@ -7,6 +7,9 @@ import android.content.ServiceConnection;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Parcel;
+import android.os.RemoteException;
+import com.xiaomi.xms.wearable.IServiceConnectedListener;
 import com.xiaomi.xms.wearable.IWearableInterface;
 import com.xiaomi.xms.wearable.Status;
 import com.xiaomi.xms.wearable.auth.Permission;
@@ -36,6 +39,20 @@ final class XmsClient {
     private final Events events;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    // XMS registers the caller's live Binder in addition to its message listener.
+    // Keep it alive for the client lifetime, including while the watch replies.
+    private final IServiceConnectedListener connectionListener = new IServiceConnectedListener.Stub() {
+        @Override public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
+            if (code == IBinder.FIRST_CALL_TRANSACTION) {
+                // XMS 1.4 sends a one-way registration acknowledgement on slot 1.
+                // Its Java interface has no method; the generated empty AIDL Stub
+                // alone would reject this transaction. Match the public SDK wire ABI.
+                data.enforceInterface("com.xiaomi.xms.wearable.IServiceConnectedListener");
+                return true;
+            }
+            return super.onTransact(code, data, reply, flags);
+        }
+    };
     private IWearableInterface service;
     private ServiceConnection binding;
     private String nodeId;
@@ -77,6 +94,8 @@ final class XmsClient {
                 IWearableInterface remote = service;
                 worker.execute(() -> {
                     try {
+                        if(epoch != generation)return;
+                        remote.registerServiceConnectedListener(connectionListener);
                         if(epoch != generation)return;
                         remote.getConnectedNodes(new INodeCallback.Stub() {
                             @Override public void onNodesConnected(List<Node> nodes) {

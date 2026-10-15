@@ -28,3 +28,20 @@ test('write failures are retryable and order/delete bounds preserve state',async
   await f.store.moveAccountOrder(0,1);assert.deepEqual((await f.store.loadAccounts()).map(a=>a.name),['B','A']);
   await f.store.removeAccountAt(0);assert.equal((await f.store.loadAccounts())[0].name,'A');
 });
+test('phone sync updates by stable ID and preserves manual accounts and ordering',async()=>{
+  const f=fixture(); await f.store.appendAccounts([item('Manual'),item('Phone')]);
+  const before=await f.store.loadAccounts();
+  const phone={...item('Phone'),syncId:'a'.repeat(32)};
+  await f.store.syncPhoneAccounts([phone]);
+  await f.store.syncPhoneAccounts([{...phone,name:'Renamed',algorithm:'SHA512',digits:8,period:60}]);
+  const after=await f.store.loadAccounts();
+  assert.equal(after.length,2);assert.deepEqual(after[0],before[0]);assert.equal(after[1].id,before[1].id);
+  assert.equal(after[1].name,'Renamed');assert.equal(after[1].algorithm,'SHA512');assert.equal(after[1].digits,8);
+});
+test('phone sync can update at capacity, but overflow and invalid IDs preserve storage',async()=>{
+  const f=fixture();const phone={...item('Phone'),syncId:'a'.repeat(32)};
+  await f.store.syncPhoneAccounts([phone]);await f.store.appendAccounts(Array.from({length:49},(_,i)=>item('Manual '+i)));
+  await f.store.syncPhoneAccounts([{...phone,name:'Updated'}]);const before=f.data;
+  await assert.rejects(f.store.syncPhoneAccounts([{...phone,syncId:'b'.repeat(32)}]));assert.equal(f.data,before);
+  await assert.rejects(f.store.syncPhoneAccounts([{...phone,syncId:'broken'}]));assert.equal(f.data,before);
+});

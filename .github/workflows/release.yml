@@ -7,7 +7,7 @@ on:
       tag:
         description: Existing version tag to release
         required: true
-        default: v1.1.0
+        default: v1.2.0
 permissions:
   contents: write
 jobs:
@@ -23,6 +23,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'build-tools;35.0.0'
       - name: Verify signed packages and release payload
         shell: bash
         env:
@@ -33,6 +39,7 @@ jobs:
           test "v$(node -p 'require("./package.json").version')" = "$RELEASE_TAG"
           npm run verify:rpk -- "releases/$RELEASE_TAG/"*.rpk
           npm run smoke:rpk -- "releases/$RELEASE_TAG/"*.rpk
+          npm run verify:apk -- "releases/$RELEASE_TAG/"*.apk
           cd "releases/$RELEASE_TAG"
           sha256sum -c SHA256SUMS
       - name: Publish exact verified artifacts
@@ -47,5 +54,5 @@ jobs:
             echo "Release already exists; preserving its assets."
             exit 0
           fi
-          gh release create "$RELEASE_TAG" "releases/$RELEASE_TAG/"*.rpk "releases/$RELEASE_TAG/totp-import.html" "releases/$RELEASE_TAG/SHA256SUMS" "releases/$RELEASE_TAG/THIRD_PARTY_NOTICES.txt" \
+          gh release create "$RELEASE_TAG" "releases/$RELEASE_TAG/"*.rpk "releases/$RELEASE_TAG/"*.apk "releases/$RELEASE_TAG/totp-import.html" "releases/$RELEASE_TAG/SHA256SUMS" "releases/$RELEASE_TAG/THIRD_PARTY_NOTICES.txt" \
             --verify-tag --title "Redmi Watch 6 TOTP $RELEASE_TAG" --notes-file "releases/$RELEASE_TAG/NOTES.md"

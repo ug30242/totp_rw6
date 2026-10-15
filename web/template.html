@@ -21,9 +21,9 @@
 <p class="notice">아래 버튼을 누르면 인증키가 화면에 표시됩니다. 다른 사람이 화면을 보지 않는 곳에서 작업하고, 등록이 끝나면 입력을 지우세요. 원본 인증기와 복구 코드를 유지하세요.</p>
 <div class="buttons"><button type="submit" id="prepare">워치 입력 정보 보기</button><button type="button" id="clear">모든 입력 지우기</button></div>
 </form>
-<p id="status" role="status" aria-live="polite">워치에서 [+ Add]를 누르고 표시된 순서대로 입력하세요.</p>
+<p id="status" role="status" aria-live="polite">워치에서 [+ Key]를 누르고 표시된 순서대로 입력하세요.</p>
 <section id="results" aria-label="워치 입력 정보"></section>
-<details><summary>등록 방법과 지원 범위</summary><p>워치의 [+ Add]에서 Secret → Name → Period → Review 순서로 입력하고 Save를 누릅니다. Secret의 공백은 건너뛰고 영문 A–Z와 숫자 2–7만 입력하세요. Name은 선택 사항이며 영문/숫자로 입력합니다. Period를 바꾸려면 워치에서 Clear를 누른 뒤 새 숫자를 입력합니다. Review에서 Hash와 Digits를 아래 정보와 일치시킵니다. 저장 후 원본 인증기와 코드가 같은지 확인하세요.</p><p>이 도구는 워치에 자동 전송하지 않습니다. Redmi Watch 6의 공개 API에는 브라우저에서 직접 쓸 수 있는 BLE 수신 기능이 없으며, 워치 QR을 휴대폰으로 읽는 것만으로 반대 방향 전송이 생기지는 않습니다. 기존 GitHub Pages 링크와 ntfy 중계는 현재 등록 경로에서 제거했습니다. Google Authenticator의 otpauth-migration과 암호화된 백업 형식은 지원하지 않습니다. 워치 키 입력 한도는 256자입니다. 계정은 워치의 일반 로컬 저장소에 보관됩니다.</p></details>
+<details><summary>등록 방법과 지원 범위</summary><p>워치의 [+ Key]에서 Secret → Name → Period → Review 순서로 입력하고 Save를 누릅니다. Secret의 공백은 건너뛰고 영문 A–Z와 숫자 2–7만 입력하세요. Name은 선택 사항이며 영문/숫자로 입력합니다. Period를 바꾸려면 워치에서 Clear를 누른 뒤 새 숫자를 입력합니다. Review에서 Hash와 Digits를 아래 정보와 일치시킵니다. 저장 후 원본 인증기와 코드가 같은지 확인하세요.</p><p>이 HTML은 직접 입력용 보조 도구입니다. 휴대폰에서 계정을 관리하고 워치로 동기화하려면 같은 릴리스의 RW6 TOTP Android 앱을 설치하세요. Android 앱의 계정 직접 추가와 동기화에는 QR이 필요하지 않습니다. Google Authenticator의 otpauth-migration과 암호화된 백업 형식은 지원하지 않습니다. 워치 키 입력 한도는 256자입니다. 계정은 워치의 일반 로컬 저장소에 보관됩니다.</p></details>
 </main>
 <script>@@QRDECODER@@</script>
 <script type="module">@@SCRIPT@@</script>

@@ -20,16 +20,38 @@ jobs:
       - run: npm run test:web
       - run: npm run build
       - name: Verify official debug RPK signatures
-        run: npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.1.0.rpk
+        run: npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.2.0.rpk
       - name: Verify committed release signatures and checksums
         run: |
-          npm run verify:rpk -- releases/v1.1.0/*.rpk
-          cd releases/v1.1.0
+          npm run verify:rpk -- releases/v1.2.0/*.rpk
+          cd releases/v1.2.0
           sha256sum -c SHA256SUMS
       - name: Execute compiled component startup and templates
-        run: npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.1.0.rpk
+        run: npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.2.0.rpk
       - uses: actions/upload-artifact@v4
         with:
           name: redmi-watch6-totp-debug
           path: dist/*.rpk
           if-no-files-found: error
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: ./gradlew --no-daemon :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
+        working-directory: android
+      - run: npm run test:interop
+      - run: npm run verify:apk -- releases/v1.2.0/rw6-totp-android-1.2.0.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-and-lint-reports
+          path: android/app/build/reports/

@@ -1,0 +1,107 @@
+<template>
+  <div class="page">
+    <div class="header">
+      <text class="title">Phone sync</text>
+      <input class="close" type="button" value="Close" onclick="goBack" />
+    </div>
+    <text class="connection">{{ connectionText }}</text>
+    <div class="content" if="{{ !pending }}">
+      <text class="hint">Open RW6 TOTP on Android.</text>
+      <text class="hint">Connect with Mi Fitness.</text>
+      <text class="hint">Tap Sync on your phone.</text>
+      <text class="hint">Keep this screen open.</text>
+    </div>
+    <div class="content" if="{{ pending }}">
+      <text class="name">{{ accountName }}</text>
+      <text class="hint">Hash: {{ algorithm }}</text>
+      <text class="hint">Digits: {{ digits }}</text>
+      <text class="hint">Period: {{ period }} seconds</text>
+      <text class="hint">Syncing from your phone...</text>
+    </div>
+    <text class="status">{{ statusText }}</text>
+    <input class="retry" type="button" value="Check connection" if="{{ !pending }}" onclick="checkConnection" />
+  </div>
+</template>
+<script>
+import router from '@system.router';
+import interconnect from '@system.interconnect';
+import { syncPhoneAccounts } from '../../common/storage';
+import { createPhoneImporter } from '../../common/phone-import';
+
+export default {
+  private: {
+    connectionText:'Checking connection...', statusText:'Waiting for phone.',
+    pending:false, busy:false, accountName:'', algorithm:'SHA1', digits:6, period:30
+  },
+  onShow() {
+    this._visible = true;
+    this.pending = false; this.busy = false; this.accountName = ''; this.statusText = 'Waiting for phone sync.';
+    try { this._connect = interconnect.instance(); }
+    catch (_) {
+      this._connect = null; this.connectionText = 'Phone sync unavailable.';
+      this.statusText = 'Use + Key on the home screen.'; return;
+    }
+    this._receiver = createPhoneImporter({
+      save:syncPhoneAccounts,
+      send:data => this._connect.send({data:{data}, fail:() => {}}),
+      update:state => {
+        this.pending = state.pending; this.busy = state.busy;
+        this.statusText = state.status; this.accountName = state.name;
+        this.algorithm = state.algorithm; this.digits = state.digits; this.period = state.period;
+      }
+    });
+    this._connect.onmessage = event => {
+      if (!this._visible || !event) return;
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'rw6-totp-hello' && message.version === 1 && /^[a-f0-9]{32}$/.test(message.id)) {
+          this._connect.send({data:{data:JSON.stringify({type:'rw6-totp-ready', version:1, id:message.id})}, fail:() => {}});
+          return;
+        }
+      } catch (_) {}
+      return this._receiver.receive(event.data);
+    };
+    this._connect.onopen = () => { if (this._visible) this.connectionText = 'Phone connected.'; };
+    this._connect.onclose = () => { if (this._visible) this.connectionText = 'Phone disconnected. Reconnect.'; };
+    this._connect.onerror = event => { if (this._visible) this.connectionText = event.code === 1001
+      ? 'Install RW6 TOTP on Android.' : 'Cannot connect. Check Mi Fitness.'; };
+    this.checkConnection();
+  },
+  onHide() { this.stopReceiving(); },
+  onDestroy() { this.stopReceiving(); },
+  checkConnection() {
+    if (!this._connect) return;
+    this._connect.getReadyState({
+      success:data => { if (this._visible) this.connectionText = data.status === 1
+        ? 'Phone connected.' : 'Open Android app and Mi Fitness.'; },
+      fail:() => { if (this._visible) this.connectionText = 'Cannot connect. Check Mi Fitness.'; }
+    });
+  },
+  stopReceiving() {
+    this._visible = false;
+    if (this._receiver) this._receiver.close();
+    this._receiver = null;
+    if (this._connect) {
+      this._connect.onmessage = () => {}; this._connect.onopen = () => {};
+      this._connect.onclose = () => {}; this._connect.onerror = () => {};
+    }
+    this.pending = false; this.accountName = '';
+  },
+  goBack() { if (!this.busy) { this.stopReceiving(); router.back(); } }
+};
+</script>
+<style>
+.page { width:432px; height:514px; padding:18px 20px; flex-direction:column; background-color:#000000; }
+.header { width:392px; height:48px; flex-direction:row; justify-content:space-between; align-items:center; }
+.title { font-size:28px; color:#f8fafc; }
+.close { width:88px; height:40px; font-size:22px; color:#e2e8f0; background-color:#1e293b; border-radius:16px; }
+.connection { width:392px; height:52px; font-size:21px; color:#38bdf8; }
+.content { width:392px; height:224px; flex-direction:column; justify-content:center; }
+.hint { width:392px; height:38px; font-size:22px; color:#cbd5e1; }
+.name { width:392px; height:44px; font-size:28px; color:#38bdf8; lines:1; text-overflow:ellipsis; }
+.status { width:392px; height:72px; font-size:22px; color:#fca5a5; }
+.footer { width:392px; height:60px; flex-direction:row; justify-content:space-between; }
+.button { width:184px; height:56px; font-size:24px; color:#f8fafc; background-color:#1e293b; border-radius:20px; }
+.primary { background-color:#0284c7; }
+.retry { width:392px; height:56px; font-size:24px; color:#f8fafc; background-color:#1e293b; border-radius:20px; }
+</style>

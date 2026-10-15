@@ -5,7 +5,8 @@ import path from 'node:path';
 
 test('current watch app has no network permission, broken QR link or relay code',()=>{
   const manifest=JSON.parse(fs.readFileSync('src/manifest.json'));
-  assert.deepEqual(manifest.features.map(f=>f.name).sort(),['system.router','system.storage','system.vibrator']);
+  assert.deepEqual(manifest.features.map(f=>f.name).sort(),['system.interconnect','system.router','system.storage','system.vibrator']);
+  assert(manifest.router.pages['pages/receive']);
   assert(manifest.router.pages['pages/manual']);assert(!manifest.router.pages['pages/add']);
   function inspect(dir) {
     for(const file of fs.readdirSync(dir,{withFileTypes:true})) {

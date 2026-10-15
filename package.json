@@ -1,7 +1,7 @@
 {
   "name": "com.vela.rw6totp",
-  "version": "1.1.0",
-  "description": "Redmi Watch 6 offline TOTP authenticator with on-watch entry and a local QR helper",
+  "version": "1.2.0",
+  "description": "Redmi Watch 6 offline TOTP with an Android QR companion",
   "scripts": {
     "start": "aiot start",
     "build": "aiot build",
@@ -11,7 +11,9 @@
     "web:build": "node scripts/build-web.cjs",
     "check": "npm test && npm run web:build && npm run build",
     "test:web": "npm run web:build && node --test e2e/*.test.cjs",
-    "smoke:rpk": "node scripts/smoke-rpk.cjs"
+    "smoke:rpk": "node scripts/smoke-rpk.cjs",
+    "verify:apk": "node scripts/verify-apk.cjs",
+    "test:interop": "node scripts/test-phone-interop.mjs"
   },
   "devDependencies": {
     "aiot-toolkit": "2.0.5",

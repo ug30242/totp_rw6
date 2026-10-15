@@ -63,11 +63,31 @@ export function createAccountStore(storage) {
       return current;
     });
   }
+  function syncPhoneAccounts(items) {
+    if (!Array.isArray(items) || !items.length || items.length > MAX_ACCOUNTS) return Promise.reject(new Error('Sync 1-50 accounts.'));
+    let validated;
+    try {
+      validated = items.map(item => {
+        if (typeof item.syncId !== 'string' || !/^[a-f0-9]{32}$/.test(item.syncId)) throw new Error('Invalid sync ID.');
+        return {...normalizeAccount(item), phoneSyncId:item.syncId};
+      });
+    } catch (e) { return Promise.reject(e); }
+    return mutate(current => {
+      for (const item of validated) {
+        let index = current.findIndex(a => a.phoneSyncId === item.phoneSyncId);
+        if (index < 0) index = current.findIndex(a => identity(normalizeAccount(a)) === identity(item));
+        if (index >= 0) current[index] = {...current[index], ...item};
+        else current.push({...item, id:'phone_' + item.phoneSyncId});
+      }
+      if (current.length > MAX_ACCOUNTS) throw new Error('Maximum 50 accounts allowed.');
+      return current;
+    });
+  }
   function removeAccountAt(index) {
     return mutate(current => {
       if (Number.isInteger(index) && index >= 0 && index < current.length) current.splice(index, 1);
       return current;
     });
   }
-  return {loadAccounts, appendAccounts, moveAccountOrder, removeAccountAt};
+  return {loadAccounts, appendAccounts, syncPhoneAccounts, moveAccountOrder, removeAccountAt};
 }

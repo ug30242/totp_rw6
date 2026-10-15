@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {smokeRpk}=require('../scripts/smoke-rpk.cjs');
-const current=()=>fs.readFileSync('releases/v1.1.0/com.vela.rw6totp.release.1.1.0.rpk');
+const current=()=>fs.readFileSync('releases/v1.2.0/com.vela.rw6totp.release.1.2.0.rpk');
 test('v1.0.1 reproduces startup failure without Node CommonJS globals',async()=>{
   await assert.rejects(smokeRpk(fs.readFileSync('releases/v1.0.1/com.vela.rw6totp.release.1.0.1.rpk')),/exports is not defined/);
 });
@@ -10,6 +10,7 @@ test('compiled release renders the first frame, empty home and offline input scr
   const screens=await smokeRpk(current());
   assert(screens['pages/index'].values.includes('No accounts yet.'));
   assert(screens['pages/manual'].values.includes('Add account'));
+  assert(screens['pages/receive'].values.includes('Phone sync'));
 });
 test('compiled storage and crypto modules load and render the RFC account OTP',async()=>{
   const screens=await smokeRpk(current(),{timestampMs:59000,accounts:[{

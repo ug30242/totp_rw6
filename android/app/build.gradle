@@ -1,0 +1,28 @@
+plugins { id 'com.android.application' }
+def projectVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def watchManifest = new groovy.json.JsonSlurper().parse(file('../../src/manifest.json'))
+android {
+    namespace 'com.vela.rw6totp'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+    defaultConfig {
+        applicationId 'com.vela.rw6totp'
+        minSdk 26
+        targetSdk 35
+        versionCode watchManifest.versionCode
+        versionName projectVersion
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildTypes { release { minifyEnabled false } }
+    testOptions { unitTests.all { systemProperty 'rw6.interop.output', layout.buildDirectory.file('interop/phone-packet.json').get().asFile.absolutePath } }
+}
+dependencies {
+    implementation project(':xms-contract')
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.zxing:core:3.5.3'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}

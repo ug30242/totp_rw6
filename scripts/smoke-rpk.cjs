@@ -12,18 +12,25 @@ async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs
   const navigation = [];
   for (const [route, pageConfig] of Object.entries(manifest.router.pages)) {
     const scheduled = new Map(); let timer = 0;
+    let storedValue = JSON.stringify(accounts);
     const context = vm.createContext({console:{log() {},warn() {},error() {}}});
+    const phoneMessages = [];
+    const connect = {getReadyState({success}) {success({status:1});},send({data,success}) {
+      assert(data && typeof data==='object' && typeof data.data==='string','XMS send requires an Object payload');
+      phoneMessages.push(JSON.parse(data.data));if(success)success();
+    }};
     if (timestampMs !== undefined) {
       assert(Number.isSafeInteger(timestampMs) && timestampMs >= 0);
       vm.runInContext('Date.now = () => ' + timestampMs, context);
     }
     const native = {
       '@app-module/system.storage': {
-        get({success,fail}) { if (failStorage) fail('unavailable',300); else success(JSON.stringify(accounts)); },
-        set({success}) { success(); }
+        get({success,fail}) { if (failStorage) fail('unavailable',300); else success(storedValue); },
+        set({value,success}) { storedValue=value;success(); }
       },
       '@app-module/system.router': {push(data) {navigation.push(data.uri);}, back() {}},
       '@app-module/system.vibrator': {vibrate() {}},
+      '@app-module/system.interconnect': {instance() {return connect;}},
       '@app-module/system.fetch': {fetch() {throw new Error('Unexpected network request during startup');}}
     };
     const requireNative = name => {
@@ -67,13 +74,26 @@ async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs
     };
     walk(tree);
     const values = nodes.map(n => typeof n.opts.value === 'function' ? n.opts.value() : n.opts.value).filter(v=>v!==undefined);
-    assert(values.some(v=>String(v).includes(route==='pages/index'?'TOTP':'Add')), 'Missing visible screen heading');
+    assert(values.some(v=>String(v).includes(route==='pages/index'?'TOTP':route==='pages/receive'?'Phone':'Add')), 'Missing visible screen heading');
     assert(nodes.some(n=>n.opts.events && n.opts.events.click),'Missing interactive controls');
     if (route === 'pages/index') {
       if (failStorage) assert(values.some(v=>String(v).includes('Storage')), 'Storage failure must be visible');
       else if (!accounts.length) assert(values.some(v=>String(v).includes('No accounts')), 'Missing empty state');
       else assert(values.some(v=>/^\d{3} \d{3}$/.test(v)),'Stored account must render an OTP');
       page.goAddPage();assert.equal(navigation.at(-1),'pages/manual');
+      if(page.goPhonePage) {page.goPhonePage();assert.equal(navigation.at(-1),'pages/receive');}
+    } else if (route === 'pages/receive') {
+      assert.equal(page.connectionText,'Phone connected.');
+      const id='a'.repeat(32);
+      connect.onmessage({data:JSON.stringify({type:'rw6-totp-hello',version:1,id})});
+      assert(phoneMessages.some(p=>p.type==='rw6-totp-ready' && p.id===id),'Watch did not complete phone handshake');
+      await connect.onmessage({data:JSON.stringify({type:'rw6-totp-sync',version:1,id,account:{
+        name:'Phone fixture',secret:'JBSWY3DPEHPK3PXP',algorithm:'SHA1',digits:6,period:30,syncId:'f'.repeat(32)
+      }})});
+      await new Promise(resolve=>setImmediate(resolve));
+      assert(phoneMessages.some(p=>p.type==='rw6-totp-result' && p.id===id && p.status===(failStorage?'error':'saved')),'Missing persistent sync acknowledgement');
+      if(!failStorage) assert(JSON.parse(storedValue).some(a=>a.name==='Phone fixture' && a.phoneSyncId==='f'.repeat(32)), 'Compiled receiver did not persist its phone account');
+      assert.equal(page.pending,false,'Sync draft leaked after save');
     } else {
       assert.equal(page.step,0,'Manual entry did not initialize');
       assert.equal(page.keyRows.length,4,'Missing on-watch Base32 keyboard');

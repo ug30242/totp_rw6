@@ -45,3 +45,13 @@ test('modified and truncated release archives fail verification',async()=>{
   await assert.rejects(verifyRpk(corrupt),/RPK content digest mismatch/);
   await assert.rejects(verifyRpk(b.subarray(0,b.length-1)),/Missing ZIP end record/);
 });
+test('v1.2.0 keeps the signing identity and adds only local phone interconnect',async()=>{
+  const crypto=require('node:crypto'),JSZip=require('jszip');
+  const bytes=fs.readFileSync('releases/v1.2.0/com.vela.rw6totp.release.1.2.0.rpk');
+  const result=await verifyRpk(bytes);assert.equal(result.version,'1.2.0');assert.equal(result.versionCode,6);
+  assert.equal(result.certificate,new crypto.X509Certificate(fs.readFileSync('certificates/release.pem')).fingerprint256);
+  const zip=await JSZip.loadAsync(bytes),manifest=JSON.parse(await zip.file('manifest.json').async('string'));
+  assert(manifest.features.some(f=>f.name==='system.interconnect'));
+  assert(!manifest.features.some(f=>/fetch|network|websocket/.test(f.name)));
+  assert(zip.file('pages/receive/index.js'));assert(zip.file('pages/manual/index.js'));
+});

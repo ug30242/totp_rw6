@@ -2,8 +2,8 @@
   "package": "com.vela.rw6totp",
   "name": "TOTP",
   "icon": "/common/icon.png",
-  "versionName": "1.1.0",
-  "versionCode": 5,
+  "versionName": "1.2.0",
+  "versionCode": 6,
   "minAPILevel": 2,
   "deviceTypeList": [
     "watch"
@@ -17,6 +17,9 @@
     },
     {
       "name": "system.router"
+    },
+    {
+      "name": "system.interconnect"
     }
   ],
   "config": {
@@ -33,6 +36,10 @@
       },
       "pages/manual": {
         "component": "index"
+      },
+      "pages/receive": {
+        "component": "index",
+        "path": "/receive"
       }
     }
   },

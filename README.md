@@ -4,9 +4,17 @@
 
 ## 설치
 
-[릴리스](https://github.com/ug30242/totp_rw6/releases)에서 **`com.vela.rw6totp.release.1.0.2.rpk`**를 다운로드하고 Notify for Xiaomi의 **펌웨어 업데이트 → 타사 앱(RPK)**에서 선택합니다. ZIP이나 소스 코드 압축파일을 선택하지 마세요. 태그의 `releases/v1.0.2/`에도 동일한 파일을 보관합니다.
+[릴리스](https://github.com/ug30242/totp_rw6/releases)에서 **`com.vela.rw6totp.release.1.0.3.rpk`**를 다운로드하고 Notify for Xiaomi의 **펌웨어 업데이트 → 타사 앱(RPK)**에서 선택합니다. ZIP이나 소스 코드 압축파일을 선택하지 마세요. 태그의 `releases/v1.0.3/`에도 동일한 파일을 보관합니다.
 
-첨부 원본 RPK는 서명에 포함된 콘텐츠 해시가 실제 패키지 내용과 달랐습니다. 공식 `aiot-toolkit 2.0.5`로 재빌드하고 외부·내부 서명, 패키지·파일 해시와 ZIP CRC를 검증했습니다. 중국판 펌웨어 **3.100.043**과 Notify for Xiaomi에서의 실제 전송·설치는 아직 검증하지 못했습니다. 상세 진단과 재설치 확인 절차는 [설치 안내](docs/notify-installation.md)에 있습니다.
+첨부 원본 RPK는 서명에 포함된 콘텐츠 해시가 실제 패키지 내용과 달랐습니다. 공식 `aiot-toolkit 2.0.5`로 재빌드하고 외부·내부 서명, 패키지·파일 해시와 ZIP CRC를 검증했습니다. 이전 버전의 설치와 홈 화면 진입은 사용자 기기에서 확인됐습니다. 새 버전의 실제 폰트·레이아웃 표시는 업데이트 후 재확인 대상입니다. 상세 진단과 재설치 확인 절차는 [설치 안내](docs/notify-installation.md)에 있습니다.
+
+## 1.0.3 워치 글자 표시 수정
+
+앱은 워치 기본 폰트를 사용하며 별도의 한글 폰트를 포함하지 않습니다. 중국판 기기에서 한글 글리프가 깨지는 사용자 보고에 따라 앱 이름·메인/QR 화면·버튼·상태/오류 메시지 전체를 ASCII 영어로 바꿨습니다. 화살표·가위표·가운뎃점 등도 Up / Down / Delete / 일반 슬래시로 교체했습니다.
+
+계정 이름은 표시 가능한 ASCII 부분을 사용합니다. 예를 들어 `네이버 (alice@example.com)`은 `(alice@example.com)`, 한글/기호만 있는 이름은 `Account 1`처럼 표시합니다. 원래 저장된 이름과 인증키는 수정하지 않습니다. 계정을 구분하기 쉽도록 등록 URI의 이름/issuer에 영문 서비스명을 사용할 수 있습니다. 영문 메타데이터가 계정 이름과 겹치지 않도록 카드 폭도 조정했습니다.
+
+소스 전체의 ASCII 문자 검사와 실제 RPK의 화면 텍스트·기존 계정 데이터 보존 검사를 추가했습니다. 워치의 실제 글리프·레이아웃을 직접 검증한 것은 아닙니다.
 
 ## 1.0.2 검은 화면 수정
 
@@ -18,10 +26,10 @@ Node 24의 모듈 구문 자동 감지로 원본 ES 모듈을 테스트합니다
 
 ## 계정 등록
 
-1. 워치에서 **+ QR 웹 추가**를 누릅니다. 세션은 5분 동안 유효합니다.
+1. 워치에서 **+ QR Add**를 누릅니다. 세션은 5분 동안 유효합니다.
 2. GitHub Pages가 설정되어 있다면 QR을 스캔하여 웹 도구를 엽니다. Pages 설정 전에는 릴리스의 `totp-import.html`을 신뢰하는 브라우저에서 열고, 워치 QR을 스캔한 **전체 URL**을 붙여넣으세요. 기기의 로컬 HTML 실행 제한이 있다면 아래 로컬 서버 방식으로 사용합니다.
 3. 원본 인증기에서 내보낸 `otpauth://totp/...` URI를 한 줄에 하나씩 입력합니다. QR 이미지 자동 인식과 Google Authenticator의 `otpauth-migration`은 지원하지 않습니다.
-4. 외부 릴레이 전송 동의 후 **암호화해서 전송**을 누르고, 워치에서 **지금 수신 확인**을 누릅니다. 중복 계정은 다시 추가하지 않습니다. 전송 크기 제한에 걸리면 계정을 나누어 등록하세요.
+4. 외부 릴레이 전송 동의 후 **암호화해서 전송**을 누르고, 워치에서 **Check**을 누릅니다. 중복 계정은 다시 추가하지 않습니다. 전송 크기 제한에 걸리면 계정을 나누어 등록하세요.
 5. 워치에서 OTP가 원본 인증기와 일치하는지 확인한 뒤 입력을 지웁니다. 워치와 휴대폰의 시간이 정확해야 합니다.
 
 ntfy.sh에는 암호문이 전송되지만 통신 메타데이터와 암호문은 보관될 수 있습니다. 별도 자체 서버는 필요 없지만 **외부 릴레이에 의존**합니다. 워치 네트워크 또는 휴대폰 앱의 네트워크 중계가 필요하며 Notify가 이 앱에 해당 기능을 제공하는지는 실기기 확인 대상입니다. 호환되는 Android 앱이 없는 `system.interconnect` 경로는 제거했습니다.
@@ -37,8 +45,8 @@ npm ci
 npm test
 npm run test:web
 npm run build
-npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.0.2.rpk
-npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.0.2.rpk
+npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.0.3.rpk
+npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.0.3.rpk
 ```
 
 브라우저 테스트에는 Chromium 또는 Google Chrome이 필요합니다. 경로가 다르면 `CHROMIUM_PATH`로 지정합니다. GUI 에뮬레이터는 선택 사항이며 AIoT IDE/에뮬레이터를 설치한 환경에서 `npm start`를 사용할 수 있습니다. 클라우드에서는 빌드, 로직 테스트와 브라우저 테스트를 검증했습니다.

@@ -29,8 +29,8 @@ test('poll receives authenticated current-session packet once and reports HTTP f
 test('stale responses, expired sessions and wrong-session envelopes do not import',async()=>{
   const f=addPage();f.p.pollRelayNow();const old=f.request;const oldPacket=f.packet();
   f.p.initSession();await old.success({code:200,data:JSON.stringify({event:'message',message:oldPacket})});assert.equal(f.saves,0);
-  await assert.rejects(f.p.processIncomingPacket(f.packet('WRONG'),f.p._generation),/세션/);assert.equal(f.saves,0);
-  f.tick(300001);f.p.pollRelayNow();assert.match(f.p.statusText,/만료/);assert.equal(f.saves,0);
+  await assert.rejects(f.p.processIncomingPacket(f.packet('WRONG'),f.p._generation),/session/);assert.equal(f.saves,0);
+  f.tick(300001);f.p.pollRelayNow();assert.match(f.p.statusText,/expired/);assert.equal(f.saves,0);
 });
 test('hiding during a request allows a fresh request after returning',async()=>{
   const f=addPage();f.p.pollRelayNow();const old=f.request;f.p.onHide();

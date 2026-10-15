@@ -12,20 +12,20 @@ export function createAccountStore(storage) {
       success(data) {
         try {
           const parsed = JSON.parse(data || '[]');
-          if (!Array.isArray(parsed)) throw new Error('계정 데이터 형식 오류');
+          if (!Array.isArray(parsed)) throw new Error('Invalid account data format');
           // Preserve unreadable data: an import must never overwrite it as [].
           parsed.forEach(normalizeAccount);
           resolve(parsed);
-        } catch (_) { reject(new Error('계정 데이터를 읽을 수 없습니다. 기존 데이터를 보존했습니다.')); }
+        } catch (_) { reject(new Error('Cannot read accounts. Data kept.')); }
       },
-      fail: () => reject(new Error('저장소를 읽을 수 없습니다. 다시 시도하세요.'))
+      fail: () => reject(new Error('Storage unavailable. Try again.'))
     }));
   }
   function saveAccounts(accounts) {
     return new Promise((resolve, reject) => storage.set({
       key: STORAGE_KEY, value: JSON.stringify(accounts),
       success: () => resolve(accounts),
-      fail: () => reject(new Error('저장 실패. 다시 시도하세요.'))
+      fail: () => reject(new Error('Save failed. Try again.'))
     }));
   }
   function mutate(fn) {
@@ -39,7 +39,7 @@ export function createAccountStore(storage) {
   function identity(a) { return [a.name, a.secret, a.algorithm, a.digits, a.period].join('\u0000'); }
   function appendAccounts(items) {
     if (!Array.isArray(items) || !items.length || items.length > MAX_ACCOUNTS) {
-      return Promise.reject(new Error('한 번에 1~50개 계정만 등록할 수 있습니다.'));
+      return Promise.reject(new Error('Import 1-50 accounts at a time.'));
     }
     let validated;
     try { validated = items.map(normalizeAccount); } catch (e) { return Promise.reject(e); }
@@ -51,7 +51,7 @@ export function createAccountStore(storage) {
         existing.push(key);
         current.push({...item, id:'acc_' + Date.now() + '_' + current.length + '_' + Math.random().toString(36).slice(2)});
       });
-      if (current.length > MAX_ACCOUNTS) throw new Error('최대 50개 계정까지 저장할 수 있습니다.');
+      if (current.length > MAX_ACCOUNTS) throw new Error('Maximum 50 accounts allowed.');
       return current;
     });
   }

@@ -58,7 +58,7 @@ form.addEventListener('submit', async event => {
     if (!response.ok) throw new Error('릴레이 전송 실패 (HTTP ' + response.status + ')');
     if (requestGeneration !== generation) return;
     accountsInput.value = '';
-    status.textContent = '전송 완료. 워치에서 [지금 수신 확인]을 누르세요.\n등록이 확인되면 이 페이지의 입력을 모두 지우세요.';
+    status.textContent = '전송 완료. 워치에서 [Check]을 누르세요.\n등록이 확인되면 이 페이지의 입력을 모두 지우세요.';
   } catch (e) {
     if (requestGeneration === generation) status.textContent = e.name === 'AbortError' ? '전송 시간이 초과되었습니다. 연결 상태를 확인하세요.' : e.message;
   } finally {

@@ -9,7 +9,7 @@ function base32ToBytes(base32) {
     .toUpperCase()
     .replace(/[\s-]+/g, '').replace(/=+$/, '');
   if (!cleaned || cleaned.length > 1024 || ![0, 2, 4, 5, 7].includes(cleaned.length % 8)) {
-    throw new Error('잘못된 Base32 키 길이입니다.');
+    throw new Error('Invalid Base32 key length.');
   }
 
   let bits = 0;
@@ -19,7 +19,7 @@ function base32ToBytes(base32) {
   for (let i = 0; i < cleaned.length; i++) {
     const idx = alphabet.indexOf(cleaned[i]);
     if (idx === -1) {
-      throw new Error('유효하지 않은 Base32 문자입니다: ' + cleaned[i]);
+      throw new Error('Invalid Base32 character.');
     }
     value = (value << 5) | idx;
     bits += 5;
@@ -28,21 +28,21 @@ function base32ToBytes(base32) {
       out.push((value >>> bits) & 0xff);
     }
   }
-  if (bits && (value & ((1 << bits) - 1)) !== 0) throw new Error('잘못된 Base32 패딩 비트입니다.');
+  if (bits && (value & ((1 << bits) - 1)) !== 0) throw new Error('Invalid Base32 padding bits.');
   return new Uint8Array(out);
 }
 
 function normalizeAccount(account) {
-  if (!account || typeof account.secret !== 'string') throw new Error('계정의 키가 없습니다.');
+  if (!account || typeof account.secret !== 'string') throw new Error('Account secret is missing.');
   const secret = account.secret.toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
   base32ToBytes(secret);
   const algorithm = String(account.algorithm || 'SHA1').toUpperCase().replace('-', '');
   const digits = account.digits === undefined ? 6 : Number(account.digits);
   const period = account.period === undefined ? 30 : Number(account.period);
-  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error('지원하지 않는 해시 알고리즘입니다.');
-  if (digits !== 6 && digits !== 8) throw new Error('OTP는 6자리 또는 8자리여야 합니다.');
-  if (!Number.isInteger(period) || period < 5 || period > 3600) throw new Error('주기는 5~3600초 정수여야 합니다.');
-  return {name:String(account.name || '새 계정').trim().slice(0, 64) || '새 계정', secret, algorithm, digits, period};
+  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error('Unsupported hash algorithm.');
+  if (digits !== 6 && digits !== 8) throw new Error('OTP must have 6 or 8 digits.');
+  if (!Number.isInteger(period) || period < 5 || period > 3600) throw new Error('Period must be 5-3600 seconds.');
+  return {name:String(account.name || 'New account').trim().slice(0, 64) || 'New account', secret, algorithm, digits, period};
 }
 
 function rotr32(x, n) {
@@ -331,7 +331,7 @@ function hmac(algo, keyBytes, msgBytes) {
 function generateTOTP(account, timestampMs) {
   account = normalizeAccount(account);
   const nowSec = Math.floor((timestampMs !== undefined ? timestampMs : Date.now()) / 1000);
-  if (!Number.isSafeInteger(nowSec) || nowSec < 0) throw new Error('잘못된 시간입니다.');
+  if (!Number.isSafeInteger(nowSec) || nowSec < 0) throw new Error('Invalid timestamp.');
   const {period, digits, algorithm} = account;
   const counter = Math.floor(nowSec / period);
 
@@ -344,7 +344,7 @@ function generateTOTP(account, timestampMs) {
 
   const keyBytes = base32ToBytes(account.secret);
   if (keyBytes.length === 0) {
-    throw new Error('비어 있거나 잘못된 시크릿 키입니다.');
+    throw new Error('Secret is empty or invalid.');
   }
   const digest = hmac(algorithm, keyBytes, counterBytes);
   const offset = digest[digest.length - 1] & 0x0f;
@@ -419,7 +419,7 @@ function bytesToHex(bytes) {
 
 function hexToBytes(hex) {
   const clean = String(hex || '');
-  if (!clean || clean.length % 2 || !/^[0-9a-f]+$/i.test(clean)) throw new Error('잘못된 16진수 데이터입니다.');
+  if (!clean || clean.length % 2 || !/^[0-9a-f]+$/i.test(clean)) throw new Error('Invalid hexadecimal data.');
   const out = new Uint8Array(clean.length / 2);
   for (let i = 0; i < out.length; i++) {
     out[i] = parseInt(clean.substr(i * 2, 2), 16);
@@ -430,10 +430,10 @@ function hexToBytes(hex) {
 function encryptPayload(obj, secretKeyStr) {
   const plainBytes = utf8ToBytes(JSON.stringify(obj));
   const keyBytes = utf8ToBytes(String(secretKeyStr || '').trim().toUpperCase());
-  if (!keyBytes.length || plainBytes.length > 24000) throw new Error('키 또는 데이터 크기를 확인하세요.');
+  if (!keyBytes.length || plainBytes.length > 24000) throw new Error('Invalid key or payload size.');
   // Encryption happens in the browser companion. Never fall back to Math.random.
   if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
-    throw new Error('보안 난수 생성기가 필요합니다.');
+    throw new Error('Secure random generator required.');
   }
   const nonce = crypto.getRandomValues(new Uint8Array(8));
 
@@ -461,16 +461,16 @@ function encryptPayload(obj, secretKeyStr) {
 
 function decryptPayload(packetStr, secretKeyStr) {
   const packet = String(packetStr || '').trim();
-  if (packet.length > 48100) throw new Error('패킷이 너무 큽니다.');
+  if (packet.length > 48100) throw new Error('Packet is too large.');
   const parts = packet.split(':');
   if (parts.length !== 4 || parts[0] !== 'RW6E1') {
-    throw new Error('올바르지 않은 암호화 패킷 형식입니다.');
+    throw new Error('Invalid encrypted packet format.');
   }
   const nonce = hexToBytes(parts[1]);
   const macTag = hexToBytes(parts[2]);
   const cipherBytes = hexToBytes(parts[3]);
   const keyBytes = utf8ToBytes(String(secretKeyStr || '').trim().toUpperCase());
-  if (nonce.length !== 8 || macTag.length !== 16 || !keyBytes.length) throw new Error('잘못된 키 또는 패킷 길이입니다.');
+  if (nonce.length !== 8 || macTag.length !== 16 || !keyBytes.length) throw new Error('Invalid key or packet length.');
 
   const macInput = new Uint8Array(nonce.length + cipherBytes.length);
   macInput.set(nonce, 0);
@@ -482,7 +482,7 @@ function decryptPayload(packetStr, secretKeyStr) {
     diff |= (macTag[i] ^ expectedMac[i]);
   }
   if (diff !== 0) {
-    throw new Error('일회용 암호화 키가 일치하지 않거나 데이터가 손상되었습니다.');
+    throw new Error('Wrong pairing key or damaged data.');
   }
 
   const plainBytes = new Uint8Array(cipherBytes.length);
@@ -505,14 +505,14 @@ function decryptPayload(packetStr, secretKeyStr) {
 function parseOtpAuthUri(uriStr) {
   const raw = String(uriStr || '').trim();
   if (!raw.toLowerCase().startsWith('otpauth://')) {
-    throw new Error('otpauth:// 로 시작하는 유효한 TOTP QR URI가 아닙니다.');
+    throw new Error('Expected an otpauth:// URI.');
   }
   // URL/URLSearchParams are not available on all Vela JS runtimes.
   const match = /^otpauth:\/\/([^/]+)\/([^?]*)\?([^#]*)(?:#.*)?$/i.exec(raw);
-  if (!match) throw new Error('올바르지 않은 OTP URI입니다.');
+  if (!match) throw new Error('Invalid OTP URI.');
   const type = match[1].toLowerCase();
   if (type !== 'totp') {
-    throw new Error('TOTP 형식(otpauth://totp/...)만 지원합니다.');
+    throw new Error('Only TOTP URIs are supported.');
   }
   const labelPath = decodeURIComponent(match[2]);
   const values = Object.create(null);
@@ -520,13 +520,13 @@ function parseOtpAuthUri(uriStr) {
     const at = pair.indexOf('=');
     const key = decodeURIComponent(at < 0 ? pair : pair.slice(0, at));
     const value = decodeURIComponent((at < 0 ? '' : pair.slice(at + 1)).replace(/\+/g, ' '));
-    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error('중복 OTP 파라미터입니다.');
+    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error('Duplicate OTP parameter.');
     values[key] = value;
   });
   const params = {get: key => values[key]};
   const secret = (params.get('secret') || '').toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
   if (!secret) {
-    throw new Error('QR 코드에 secret 파라미터가 없습니다.');
+    throw new Error('OTP URI is missing its secret.');
   }
   base32ToBytes(secret); // validate Base32
 
@@ -540,7 +540,7 @@ function parseOtpAuthUri(uriStr) {
   }
   const displayName = issuer && accountName && !accountName.toLowerCase().startsWith(issuer.toLowerCase())
     ? `${issuer} (${accountName})`
-    : (accountName || issuer || '새 계정');
+    : (accountName || issuer || 'New account');
 
   const rawAlgo = (params.get('algorithm') || 'SHA1').toUpperCase().replace('-', '');
   const account = normalizeAccount({

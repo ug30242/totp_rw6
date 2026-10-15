@@ -1,8 +1,8 @@
 <template>
   <div class="page">
     <div class="header">
-      <text class="title">웹 QR 등록</text>
-      <input class="btn-back" type="button" value="닫기" onclick="goBack" />
+      <text class="title">Add via QR</text>
+      <input class="btn-back" type="button" value="Close" onclick="goBack" />
     </div>
 
     <div class="qr-wrap">
@@ -10,13 +10,13 @@
     </div>
 
     <div class="info-box">
-      <text class="code-line">QR 스캔 또는 웹 도구에 URL 입력</text>
+      <text class="code-line">Scan QR with your phone</text>
       <text class="status-line">{{ statusText }}</text>
     </div>
 
     <div class="footer">
-      <input class="btn-poll" type="button" value="지금 수신 확인" onclick="pollRelayNow" />
-      <input class="btn-new" type="button" value="새 코드" onclick="initSession" />
+      <input class="btn-poll" type="button" value="Check" onclick="pollRelayNow" />
+      <input class="btn-new" type="button" value="New QR" onclick="initSession" />
     </div>
   </div>
 </template>
@@ -71,22 +71,22 @@ export default {
     this.sessionKey = this.randomChars(20);
     // All pairing data stays in the fragment, outside HTTP request URLs.
     this.qrValue = IMPORT_URL + '#sid=' + this.sessionId + '&key=' + this.sessionKey;
-    this.statusText = '5분 이내 웹 전송 후 수신 확인';
+    this.statusText = 'Send, then tap Check (5 min)';
   },
 
   async processIncomingPacket(rawPacket, generation) {
     if (!this._visible || generation !== this._generation || this._processing || this._consumed) return false;
-    if (Date.now() - this._createdAt > SESSION_MS) throw new Error('세션 만료. 새 코드를 생성하세요.');
+    if (Date.now() - this._createdAt > SESSION_MS) throw new Error('Session expired. Tap New QR.');
     this._processing = true;
     try {
       const payload = decryptPayload(rawPacket, this.sessionKey);
       if (!payload || payload.sid !== this.sessionId || !Number.isSafeInteger(payload.expiresAt) ||
           payload.expiresAt < Date.now() || payload.expiresAt > this._createdAt + 2 * SESSION_MS) {
-        throw new Error('세션 또는 전송 유효시간을 확인하세요.');
+        throw new Error('Wrong or expired session.');
       }
       await appendAccounts(payload.accounts);
       this._consumed = true;
-      this.statusText = '계정 등록 완료 (중복 제외)';
+      this.statusText = 'Accounts saved (no duplicates)';
       vibrator.vibrate({ mode: 'short' });
       if (this._visible) this._closeTimer = setTimeout(() => {
         if (this._visible && generation === this._generation) router.back();
@@ -98,11 +98,11 @@ export default {
   pollRelayNow() {
     if (this.busy || this._consumed) return;
     if (Date.now() - this._createdAt > SESSION_MS) {
-      this.statusText = '세션 만료. 새 코드를 생성하세요.';
+      this.statusText = 'Session expired. Tap New QR.';
       return;
     }
     this.busy = true;
-    this.statusText = '암호화 데이터 수신 확인 중...';
+    this.statusText = 'Receiving encrypted data...';
     const generation = this._generation;
     const url = RELAY_BASE_URL + '/rw6_totp_' + this.sessionId + '/json?poll=1&since=' + Math.floor(this._createdAt / 1000);
     const active = () => this._visible && generation === this._generation;
@@ -111,9 +111,9 @@ export default {
       success: async (res) => {
         if (!active()) return;
         try {
-          if (!res || res.code < 200 || res.code >= 300) throw new Error('서버 응답 오류 (' + (res && res.code) + ')');
+          if (!res || res.code < 200 || res.code >= 300) throw new Error('Server error (' + (res && res.code) + ')');
           const body = String(res.data || '').trim();
-          if (body.length > 100000) throw new Error('수신 데이터가 너무 큽니다.');
+          if (body.length > 100000) throw new Error('Received data too large.');
           const lines = body ? body.split(String.fromCharCode(10)) : [];
           let lastError = '';
           for (let i = lines.length - 1; i >= 0; i--) {
@@ -124,12 +124,12 @@ export default {
               }
             } catch (e) { lastError = e.message; }
           }
-          if (active()) this.statusText = lastError || '아직 전송된 데이터가 없습니다.';
+          if (active()) this.statusText = lastError || 'Nothing received yet.';
         } catch (e) { if (active()) this.statusText = e.message; }
         finally { if (active()) this.busy = false; }
       },
       fail: (data, code) => {
-        if (active()) { this.busy = false; this.statusText = '네트워크 확인 필요 (' + code + ')'; }
+        if (active()) { this.busy = false; this.statusText = 'Check connection (' + code + ')'; }
       }
     });
   },

@@ -1,9 +1,9 @@
 {
   "package": "com.vela.rw6totp",
-  "name": "TOTP 인증기",
+  "name": "TOTP",
   "icon": "/common/icon.png",
-  "versionName": "1.0.2",
-  "versionCode": 3,
+  "versionName": "1.0.3",
+  "versionCode": 4,
   "minAPILevel": 2,
   "deviceTypeList": [
     "watch"

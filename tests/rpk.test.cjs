@@ -17,6 +17,16 @@ test('v1.0.2 has valid signatures and preserves the release signing identity',as
   assert.equal(result.version,'1.0.2');assert.equal(result.versionCode,3);
   assert.equal(result.certificate,new crypto.X509Certificate(fs.readFileSync('certificates/release.pem')).fingerprint256);
 });
+test('v1.0.3 uses the existing signing identity and ASCII launcher name',async()=>{
+  const crypto=require('node:crypto');
+  const JSZip=require('jszip');
+  const bytes=fs.readFileSync('releases/v1.0.3/com.vela.rw6totp.release.1.0.3.rpk');
+  const result=await verifyRpk(bytes);
+  assert.equal(result.version,'1.0.3');assert.equal(result.versionCode,4);
+  assert.equal(result.certificate,new crypto.X509Certificate(fs.readFileSync('certificates/release.pem')).fingerprint256);
+  const zip=await JSZip.loadAsync(bytes);
+  assert.equal(JSON.parse(await zip.file('manifest.json').async('string')).name,'TOTP');
+});
 test('modified and truncated release archives fail verification',async()=>{
   const b=fs.readFileSync('releases/v1.0.1/com.vela.rw6totp.release.1.0.1.rpk');
   const corrupt=Buffer.from(b);corrupt[40]^=1;

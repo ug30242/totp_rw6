@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://ntfy.sh; script-src 'sha256-2zSUzkMc56Z5Wml45sae2v2O5dGsdD0ZQ/YJzR3T2oM='; style-src 'sha256-m+iXZ4FHqDeWSv1H36PH4Uy0mTHW7WhfrAisM77M/3Y='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://ntfy.sh; script-src 'sha256-nKC58rgUgVyoUMBBOmqxsrZnAnEg9NM1lDEHvZp4REY='; style-src 'sha256-m+iXZ4FHqDeWSv1H36PH4Uy0mTHW7WhfrAisM77M/3Y='; base-uri 'none'; form-action 'none'">
 <title>Redmi Watch TOTP 계정 등록</title>
 <style>:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0b1120;color:#e2e8f0}*{box-sizing:border-box}main{max-width:680px;margin:4vh auto;padding:24px}h1{font-size:1.8rem}p{line-height:1.7;color:#b6c4d8}label{display:block;margin-top:24px;font-weight:600}input[type=text],textarea{display:block;width:100%;margin-top:10px;border:1px solid #475569;border-radius:10px;padding:14px;background:#111c30;color:#f8fafc;font:inherit}textarea{resize:vertical;overflow-wrap:anywhere}.notice,details{font-size:.9rem}.consent{font-size:.9rem;line-height:1.6;font-weight:400}.buttons{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}button{border:0;border-radius:12px;padding:14px 20px;font:inherit;font-weight:600;background:#38bdf8;color:#071422;cursor:pointer}button:disabled{opacity:.5;cursor:wait}#clear{background:#334155;color:#f8fafc}#status{padding:16px;border:1px solid #334155;border-radius:10px;white-space:pre-wrap}input:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}details{line-height:1.7;margin-top:24px}summary{cursor:pointer}
 </style>
@@ -12,7 +12,7 @@
 <body>
 <main>
 <h1>워치에 TOTP 계정 등록</h1>
-<p>워치에서 [+ QR 웹 추가]를 누른 뒤 QR을 스캔하세요. 다운로드한 도구를 사용한다면 스캔한 URL을 아래에 붙여넣으세요. 키는 이 페이지에 저장하지 않습니다.</p>
+<p>워치에서 [+ QR Add]를 누른 뒤 QR을 스캔하세요. 다운로드한 도구를 사용한다면 스캔한 URL을 아래에 붙여넣으세요. 키는 이 페이지에 저장하지 않습니다.</p>
 <form id="import-form">
 <label for="pairing">워치 QR의 URL</label>
 <input id="pairing" type="text" autocomplete="off" spellcheck="false" placeholder="https://ug30242.github.io/totp_rw6/#sid=…&amp;key=…" required>
@@ -23,7 +23,7 @@
 <div class="buttons"><button type="submit" id="send">암호화해서 전송</button><button type="button" id="clear">모든 입력 지우기</button></div>
 </form>
 <p id="status" role="status" aria-live="polite">워치의 세션은 5분 후 만료됩니다.</p>
-<details><summary>연결·보안 안내</summary><p>전송 후 워치에서 [지금 수신 확인]을 누르세요. 워치의 네트워크 연결과 Notify의 네트워크 중계 지원이 필요합니다. 실패하면 새 QR로 다시 시도하세요. 계정은 워치 로컬 저장소에 저장됩니다. 보안 저장소·암호화 보관을 보장하지 않습니다. 현재 RW6E1 전송 방식은 독립 보안 감사를 받지 않았으며 워치 페어링 난수의 암호학적 안전성도 확인되지 않았습니다. 원본 인증기의 계정과 복구 코드를 유지하세요.</p></details>
+<details><summary>연결·보안 안내</summary><p>전송 후 워치에서 [Check]을 누르세요. 워치의 네트워크 연결과 Notify의 네트워크 중계 지원이 필요합니다. 실패하면 새 QR로 다시 시도하세요. 계정은 워치 로컬 저장소에 저장됩니다. 보안 저장소·암호화 보관을 보장하지 않습니다. 현재 RW6E1 전송 방식은 독립 보안 감사를 받지 않았으며 워치 페어링 난수의 암호학적 안전성도 확인되지 않았습니다. 원본 인증기의 계정과 복구 코드를 유지하세요.</p></details>
 </main>
 <script type="module">// ============================================================================
 // Pure-JS RFC 6238 TOTP & HMAC-SHA256 E2EE Engine (SHA-1 / SHA-256 / SHA-512)
@@ -36,7 +36,7 @@ function base32ToBytes(base32) {
     .toUpperCase()
     .replace(/[\s-]+/g, '').replace(/=+$/, '');
   if (!cleaned || cleaned.length > 1024 || ![0, 2, 4, 5, 7].includes(cleaned.length % 8)) {
-    throw new Error('잘못된 Base32 키 길이입니다.');
+    throw new Error('Invalid Base32 key length.');
   }
 
   let bits = 0;
@@ -46,7 +46,7 @@ function base32ToBytes(base32) {
   for (let i = 0; i < cleaned.length; i++) {
     const idx = alphabet.indexOf(cleaned[i]);
     if (idx === -1) {
-      throw new Error('유효하지 않은 Base32 문자입니다: ' + cleaned[i]);
+      throw new Error('Invalid Base32 character.');
     }
     value = (value << 5) | idx;
     bits += 5;
@@ -55,21 +55,21 @@ function base32ToBytes(base32) {
       out.push((value >>> bits) & 0xff);
     }
   }
-  if (bits && (value & ((1 << bits) - 1)) !== 0) throw new Error('잘못된 Base32 패딩 비트입니다.');
+  if (bits && (value & ((1 << bits) - 1)) !== 0) throw new Error('Invalid Base32 padding bits.');
   return new Uint8Array(out);
 }
 
 function normalizeAccount(account) {
-  if (!account || typeof account.secret !== 'string') throw new Error('계정의 키가 없습니다.');
+  if (!account || typeof account.secret !== 'string') throw new Error('Account secret is missing.');
   const secret = account.secret.toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
   base32ToBytes(secret);
   const algorithm = String(account.algorithm || 'SHA1').toUpperCase().replace('-', '');
   const digits = account.digits === undefined ? 6 : Number(account.digits);
   const period = account.period === undefined ? 30 : Number(account.period);
-  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error('지원하지 않는 해시 알고리즘입니다.');
-  if (digits !== 6 && digits !== 8) throw new Error('OTP는 6자리 또는 8자리여야 합니다.');
-  if (!Number.isInteger(period) || period < 5 || period > 3600) throw new Error('주기는 5~3600초 정수여야 합니다.');
-  return {name:String(account.name || '새 계정').trim().slice(0, 64) || '새 계정', secret, algorithm, digits, period};
+  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error('Unsupported hash algorithm.');
+  if (digits !== 6 && digits !== 8) throw new Error('OTP must have 6 or 8 digits.');
+  if (!Number.isInteger(period) || period < 5 || period > 3600) throw new Error('Period must be 5-3600 seconds.');
+  return {name:String(account.name || 'New account').trim().slice(0, 64) || 'New account', secret, algorithm, digits, period};
 }
 
 function rotr32(x, n) {
@@ -358,7 +358,7 @@ function hmac(algo, keyBytes, msgBytes) {
 function generateTOTP(account, timestampMs) {
   account = normalizeAccount(account);
   const nowSec = Math.floor((timestampMs !== undefined ? timestampMs : Date.now()) / 1000);
-  if (!Number.isSafeInteger(nowSec) || nowSec < 0) throw new Error('잘못된 시간입니다.');
+  if (!Number.isSafeInteger(nowSec) || nowSec < 0) throw new Error('Invalid timestamp.');
   const {period, digits, algorithm} = account;
   const counter = Math.floor(nowSec / period);
 
@@ -371,7 +371,7 @@ function generateTOTP(account, timestampMs) {
 
   const keyBytes = base32ToBytes(account.secret);
   if (keyBytes.length === 0) {
-    throw new Error('비어 있거나 잘못된 시크릿 키입니다.');
+    throw new Error('Secret is empty or invalid.');
   }
   const digest = hmac(algorithm, keyBytes, counterBytes);
   const offset = digest[digest.length - 1] & 0x0f;
@@ -446,7 +446,7 @@ function bytesToHex(bytes) {
 
 function hexToBytes(hex) {
   const clean = String(hex || '');
-  if (!clean || clean.length % 2 || !/^[0-9a-f]+$/i.test(clean)) throw new Error('잘못된 16진수 데이터입니다.');
+  if (!clean || clean.length % 2 || !/^[0-9a-f]+$/i.test(clean)) throw new Error('Invalid hexadecimal data.');
   const out = new Uint8Array(clean.length / 2);
   for (let i = 0; i < out.length; i++) {
     out[i] = parseInt(clean.substr(i * 2, 2), 16);
@@ -457,10 +457,10 @@ function hexToBytes(hex) {
 function encryptPayload(obj, secretKeyStr) {
   const plainBytes = utf8ToBytes(JSON.stringify(obj));
   const keyBytes = utf8ToBytes(String(secretKeyStr || '').trim().toUpperCase());
-  if (!keyBytes.length || plainBytes.length > 24000) throw new Error('키 또는 데이터 크기를 확인하세요.');
+  if (!keyBytes.length || plainBytes.length > 24000) throw new Error('Invalid key or payload size.');
   // Encryption happens in the browser companion. Never fall back to Math.random.
   if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
-    throw new Error('보안 난수 생성기가 필요합니다.');
+    throw new Error('Secure random generator required.');
   }
   const nonce = crypto.getRandomValues(new Uint8Array(8));
 
@@ -488,16 +488,16 @@ function encryptPayload(obj, secretKeyStr) {
 
 function decryptPayload(packetStr, secretKeyStr) {
   const packet = String(packetStr || '').trim();
-  if (packet.length > 48100) throw new Error('패킷이 너무 큽니다.');
+  if (packet.length > 48100) throw new Error('Packet is too large.');
   const parts = packet.split(':');
   if (parts.length !== 4 || parts[0] !== 'RW6E1') {
-    throw new Error('올바르지 않은 암호화 패킷 형식입니다.');
+    throw new Error('Invalid encrypted packet format.');
   }
   const nonce = hexToBytes(parts[1]);
   const macTag = hexToBytes(parts[2]);
   const cipherBytes = hexToBytes(parts[3]);
   const keyBytes = utf8ToBytes(String(secretKeyStr || '').trim().toUpperCase());
-  if (nonce.length !== 8 || macTag.length !== 16 || !keyBytes.length) throw new Error('잘못된 키 또는 패킷 길이입니다.');
+  if (nonce.length !== 8 || macTag.length !== 16 || !keyBytes.length) throw new Error('Invalid key or packet length.');
 
   const macInput = new Uint8Array(nonce.length + cipherBytes.length);
   macInput.set(nonce, 0);
@@ -509,7 +509,7 @@ function decryptPayload(packetStr, secretKeyStr) {
     diff |= (macTag[i] ^ expectedMac[i]);
   }
   if (diff !== 0) {
-    throw new Error('일회용 암호화 키가 일치하지 않거나 데이터가 손상되었습니다.');
+    throw new Error('Wrong pairing key or damaged data.');
   }
 
   const plainBytes = new Uint8Array(cipherBytes.length);
@@ -532,14 +532,14 @@ function decryptPayload(packetStr, secretKeyStr) {
 function parseOtpAuthUri(uriStr) {
   const raw = String(uriStr || '').trim();
   if (!raw.toLowerCase().startsWith('otpauth://')) {
-    throw new Error('otpauth:// 로 시작하는 유효한 TOTP QR URI가 아닙니다.');
+    throw new Error('Expected an otpauth:// URI.');
   }
   // URL/URLSearchParams are not available on all Vela JS runtimes.
   const match = /^otpauth:\/\/([^/]+)\/([^?]*)\?([^#]*)(?:#.*)?$/i.exec(raw);
-  if (!match) throw new Error('올바르지 않은 OTP URI입니다.');
+  if (!match) throw new Error('Invalid OTP URI.');
   const type = match[1].toLowerCase();
   if (type !== 'totp') {
-    throw new Error('TOTP 형식(otpauth://totp/...)만 지원합니다.');
+    throw new Error('Only TOTP URIs are supported.');
   }
   const labelPath = decodeURIComponent(match[2]);
   const values = Object.create(null);
@@ -547,13 +547,13 @@ function parseOtpAuthUri(uriStr) {
     const at = pair.indexOf('=');
     const key = decodeURIComponent(at < 0 ? pair : pair.slice(0, at));
     const value = decodeURIComponent((at < 0 ? '' : pair.slice(at + 1)).replace(/\+/g, ' '));
-    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error('중복 OTP 파라미터입니다.');
+    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error('Duplicate OTP parameter.');
     values[key] = value;
   });
   const params = {get: key => values[key]};
   const secret = (params.get('secret') || '').toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
   if (!secret) {
-    throw new Error('QR 코드에 secret 파라미터가 없습니다.');
+    throw new Error('OTP URI is missing its secret.');
   }
   base32ToBytes(secret); // validate Base32
 
@@ -567,7 +567,7 @@ function parseOtpAuthUri(uriStr) {
   }
   const displayName = issuer && accountName && !accountName.toLowerCase().startsWith(issuer.toLowerCase())
     ? `${issuer} (${accountName})`
-    : (accountName || issuer || '새 계정');
+    : (accountName || issuer || 'New account');
 
   const rawAlgo = (params.get('algorithm') || 'SHA1').toUpperCase().replace('-', '');
   const account = normalizeAccount({
@@ -641,7 +641,7 @@ form.addEventListener('submit', async event => {
     if (!response.ok) throw new Error('릴레이 전송 실패 (HTTP ' + response.status + ')');
     if (requestGeneration !== generation) return;
     accountsInput.value = '';
-    status.textContent = '전송 완료. 워치에서 [지금 수신 확인]을 누르세요.\n등록이 확인되면 이 페이지의 입력을 모두 지우세요.';
+    status.textContent = '전송 완료. 워치에서 [Check]을 누르세요.\n등록이 확인되면 이 페이지의 입력을 모두 지우세요.';
   } catch (e) {
     if (requestGeneration === generation) status.textContent = e.name === 'AbortError' ? '전송 시간이 초과되었습니다. 연결 상태를 확인하세요.' : e.message;
   } finally {

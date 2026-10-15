@@ -1,6 +1,6 @@
 {
   "name": "com.vela.rw6totp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Redmi Watch 6 TOTP authenticator with a static web importer and encrypted relay",
   "scripts": {
     "start": "aiot start",

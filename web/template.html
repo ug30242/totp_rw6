@@ -11,7 +11,7 @@
 <body>
 <main>
 <h1>워치에 TOTP 계정 등록</h1>
-<p>워치에서 [+ QR 웹 추가]를 누른 뒤 QR을 스캔하세요. 다운로드한 도구를 사용한다면 스캔한 URL을 아래에 붙여넣으세요. 키는 이 페이지에 저장하지 않습니다.</p>
+<p>워치에서 [+ QR Add]를 누른 뒤 QR을 스캔하세요. 다운로드한 도구를 사용한다면 스캔한 URL을 아래에 붙여넣으세요. 키는 이 페이지에 저장하지 않습니다.</p>
 <form id="import-form">
 <label for="pairing">워치 QR의 URL</label>
 <input id="pairing" type="text" autocomplete="off" spellcheck="false" placeholder="https://ug30242.github.io/totp_rw6/#sid=…&amp;key=…" required>
@@ -22,7 +22,7 @@
 <div class="buttons"><button type="submit" id="send">암호화해서 전송</button><button type="button" id="clear">모든 입력 지우기</button></div>
 </form>
 <p id="status" role="status" aria-live="polite">워치의 세션은 5분 후 만료됩니다.</p>
-<details><summary>연결·보안 안내</summary><p>전송 후 워치에서 [지금 수신 확인]을 누르세요. 워치의 네트워크 연결과 Notify의 네트워크 중계 지원이 필요합니다. 실패하면 새 QR로 다시 시도하세요. 계정은 워치 로컬 저장소에 저장됩니다. 보안 저장소·암호화 보관을 보장하지 않습니다. 현재 RW6E1 전송 방식은 독립 보안 감사를 받지 않았으며 워치 페어링 난수의 암호학적 안전성도 확인되지 않았습니다. 원본 인증기의 계정과 복구 코드를 유지하세요.</p></details>
+<details><summary>연결·보안 안내</summary><p>전송 후 워치에서 [Check]을 누르세요. 워치의 네트워크 연결과 Notify의 네트워크 중계 지원이 필요합니다. 실패하면 새 QR로 다시 시도하세요. 계정은 워치 로컬 저장소에 저장됩니다. 보안 저장소·암호화 보관을 보장하지 않습니다. 현재 RW6E1 전송 방식은 독립 보안 감사를 받지 않았으며 워치 페어링 난수의 암호학적 안전성도 확인되지 않았습니다. 원본 인증기의 계정과 복구 코드를 유지하세요.</p></details>
 </main>
 <script type="module">@@SCRIPT@@</script>
 </body>

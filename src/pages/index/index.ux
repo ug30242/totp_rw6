@@ -1,22 +1,22 @@
 <template>
   <div class="page">
     <div class="header">
-      <text class="title">TOTP 인증기</text>
+      <text class="title">TOTP</text>
       <text class="badge">{{ globalRemaining }}s</text>
     </div>
 
     <text class="error-text" if="{{ errorText }}">{{ errorText }}</text>
 
     <div class="empty-box" if="{{ accounts.length === 0 }}">
-      <text class="empty-text">등록된 TOTP 계정이 없습니다.</text>
-      <text class="empty-sub">아래 [+ QR 웹 추가]를 눌러 등록하세요.</text>
+      <text class="empty-text">No accounts yet.</text>
+      <text class="empty-sub">Tap + QR Add to get started.</text>
     </div>
 
     <list class="account-list" if="{{ accounts.length > 0 }}">
       <list-item type="account-card" class="card" for="{{ (idx, item) in renderedList }}">
         <div class="card-top">
           <text class="acc-name">{{ item.name }}</text>
-          <text class="acc-meta">{{ item.algorithm }} · {{ item.digits }}자리</text>
+          <text class="acc-meta">{{ item.algorithm }} / {{ item.digits }} digits</text>
         </div>
 
         <div class="code-row">
@@ -25,16 +25,16 @@
         </div>
 
         <div class="edit-row" if="{{ editMode }}">
-          <input class="act-btn" type="button" value="▲ 위로" onclick="onMoveUp(idx)" />
-          <input class="act-btn" type="button" value="▼ 아래로" onclick="onMoveDown(idx)" />
-          <input class="act-btn del-btn" type="button" value="{{ deleteIndex === idx ? '삭제 확인' : '✕ 삭제' }}" onclick="onDelete(idx)" />
+          <input class="act-btn" type="button" value="Up" onclick="onMoveUp(idx)" />
+          <input class="act-btn" type="button" value="Down" onclick="onMoveDown(idx)" />
+          <input class="act-btn del-btn" type="button" value="{{ deleteIndex === idx ? 'Confirm' : 'Delete' }}" onclick="onDelete(idx)" />
         </div>
       </list-item>
     </list>
 
     <div class="footer">
-      <input class="btn-add" type="button" value="+ QR 웹 추가" onclick="goAddPage" />
-      <input class="btn-edit" type="button" value="{{ editMode ? '완료' : '순서/삭제' }}" onclick="toggleEdit" />
+      <input class="btn-add" type="button" value="+ QR Add" onclick="goAddPage" />
+      <input class="btn-edit" type="button" value="{{ editMode ? 'Done' : 'Edit' }}" onclick="toggleEdit" />
     </div>
   </div>
 </template>
@@ -43,6 +43,7 @@
 import router from '@system.router';
 import vibrator from '@system.vibrator';
 import { generateTOTP } from '../../common/totp';
+import { displayAccountName } from '../../common/display-name';
 import { loadAccounts, moveAccountOrder, removeAccountAt } from '../../common/storage';
 
 export default {
@@ -122,7 +123,7 @@ export default {
         const remaining = res.period - nowSec % res.period;
         list.push({
           id: acc.id,
-          name: acc.name,
+          name: displayAccountName(acc.name, i),
           algorithm: acc.algorithm || 'SHA1',
           digits: acc.digits || 6,
           formattedOtp: this.formatOtp(res.otp),
@@ -132,7 +133,7 @@ export default {
       } catch (_) {
         list.push({
           id: acc.id,
-          name: acc.name,
+          name: displayAccountName(acc.name, i),
           algorithm: acc.algorithm || 'SHA1',
           digits: acc.digits || 6,
           formattedOtp: 'ERR KEY',
@@ -253,10 +254,12 @@ export default {
   color: #cbd5e1;
   lines: 1;
   text-overflow: ellipsis;
-  width: 240px;
+  width: 200px;
 }
 .acc-meta {
-  font-size: 20px;
+  font-size: 18px;
+  width: 136px;
+  text-align: right;
   color: #64748b;
 }
 .code-row {

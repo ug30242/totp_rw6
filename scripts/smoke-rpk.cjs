@@ -70,8 +70,8 @@ async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs
     assert(values.some(v=>String(v).includes(route==='pages/index'?'TOTP':'QR')), 'Missing visible screen heading');
     assert(nodes.some(n=>n.opts.events && n.opts.events.click),'Missing interactive controls');
     if (route === 'pages/index') {
-      if (failStorage) assert(values.some(v=>String(v).includes('저장소')), 'Storage failure must be visible');
-      else if (!accounts.length) assert(values.some(v=>String(v).includes('등록된 TOTP')), 'Missing empty state');
+      if (failStorage) assert(values.some(v=>String(v).includes('Storage')), 'Storage failure must be visible');
+      else if (!accounts.length) assert(values.some(v=>String(v).includes('No accounts')), 'Missing empty state');
       else assert(values.some(v=>/^\d{3} \d{3}$/.test(v)),'Stored account must render an OTP');
       page.goAddPage();assert.equal(navigation.at(-1),'pages/add');
     } else {

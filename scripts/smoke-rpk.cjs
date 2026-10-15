@@ -67,15 +67,23 @@ async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs
     };
     walk(tree);
     const values = nodes.map(n => typeof n.opts.value === 'function' ? n.opts.value() : n.opts.value).filter(v=>v!==undefined);
-    assert(values.some(v=>String(v).includes(route==='pages/index'?'TOTP':'QR')), 'Missing visible screen heading');
+    assert(values.some(v=>String(v).includes(route==='pages/index'?'TOTP':'Add')), 'Missing visible screen heading');
     assert(nodes.some(n=>n.opts.events && n.opts.events.click),'Missing interactive controls');
     if (route === 'pages/index') {
       if (failStorage) assert(values.some(v=>String(v).includes('Storage')), 'Storage failure must be visible');
       else if (!accounts.length) assert(values.some(v=>String(v).includes('No accounts')), 'Missing empty state');
       else assert(values.some(v=>/^\d{3} \d{3}$/.test(v)),'Stored account must render an OTP');
-      page.goAddPage();assert.equal(navigation.at(-1),'pages/add');
+      page.goAddPage();assert.equal(navigation.at(-1),'pages/manual');
     } else {
-      assert(/^https:\/\/.*#sid=RW6/.test(page.qrValue),'Pairing screen did not initialize');
+      assert.equal(page.step,0,'Manual entry did not initialize');
+      assert.equal(page.keyRows.length,4,'Missing on-watch Base32 keyboard');
+      assert.equal(page.secret,'','Secret draft should start empty');
+      const keys = nodes.filter(n=>n.tag==='input' && typeof n.opts.value==='function' && /^[A-Z2-7]$/.test(n.opts.value()));
+      assert.equal(keys.length,32,'Every Base32 key must be rendered');
+      const key = keys.find(n=>n.opts.value()==='M');
+      key.opts.events.click({});
+      assert.equal(page.secret,'M','Compiled keyboard event did not reach its field');
+      page.clearField();
     }
     trees[route] = {values,nodes:nodes.length,firstFrame:true};
     if (page.onHide) page.onHide();

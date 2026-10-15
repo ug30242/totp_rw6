@@ -27,6 +27,18 @@ test('v1.0.3 uses the existing signing identity and ASCII launcher name',async()
   const zip=await JSZip.loadAsync(bytes);
   assert.equal(JSON.parse(await zip.file('manifest.json').async('string')).name,'TOTP');
 });
+test('v1.1.0 preserves the signing identity and exposes only offline entry',async()=>{
+  const crypto=require('node:crypto');
+  const JSZip=require('jszip');
+  const bytes=fs.readFileSync('releases/v1.1.0/com.vela.rw6totp.release.1.1.0.rpk');
+  const result=await verifyRpk(bytes);
+  assert.equal(result.version,'1.1.0');assert.equal(result.versionCode,5);
+  assert.equal(result.certificate,new crypto.X509Certificate(fs.readFileSync('certificates/release.pem')).fingerprint256);
+  const zip=await JSZip.loadAsync(bytes);
+  const manifest=JSON.parse(await zip.file('manifest.json').async('string'));
+  assert(!manifest.features.some(f=>/fetch|interconnect|bluetooth|network/.test(f.name)));
+  assert(zip.file('pages/manual/index.js'));assert(!zip.file('pages/add/index.js'));
+});
 test('modified and truncated release archives fail verification',async()=>{
   const b=fs.readFileSync('releases/v1.0.1/com.vela.rw6totp.release.1.0.1.rpk');
   const corrupt=Buffer.from(b);corrupt[40]^=1;

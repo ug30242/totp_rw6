@@ -7,7 +7,7 @@ on:
       tag:
         description: Existing version tag to release
         required: true
-        default: v1.0.3
+        default: v1.1.0
 permissions:
   contents: write
 jobs:
@@ -47,5 +47,5 @@ jobs:
             echo "Release already exists; preserving its assets."
             exit 0
           fi
-          gh release create "$RELEASE_TAG" "releases/$RELEASE_TAG/"*.rpk "releases/$RELEASE_TAG/totp-import.html" "releases/$RELEASE_TAG/SHA256SUMS" \
+          gh release create "$RELEASE_TAG" "releases/$RELEASE_TAG/"*.rpk "releases/$RELEASE_TAG/totp-import.html" "releases/$RELEASE_TAG/SHA256SUMS" "releases/$RELEASE_TAG/THIRD_PARTY_NOTICES.txt" \
             --verify-tag --title "Redmi Watch 6 TOTP $RELEASE_TAG" --notes-file "releases/$RELEASE_TAG/NOTES.md"

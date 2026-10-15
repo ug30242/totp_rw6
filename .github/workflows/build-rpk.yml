@@ -20,14 +20,14 @@ jobs:
       - run: npm run test:web
       - run: npm run build
       - name: Verify official debug RPK signatures
-        run: npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.0.3.rpk
+        run: npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.1.0.rpk
       - name: Verify committed release signatures and checksums
         run: |
-          npm run verify:rpk -- releases/v1.0.3/*.rpk
-          cd releases/v1.0.3
+          npm run verify:rpk -- releases/v1.1.0/*.rpk
+          cd releases/v1.1.0
           sha256sum -c SHA256SUMS
       - name: Execute compiled component startup and templates
-        run: npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.0.3.rpk
+        run: npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.1.0.rpk
       - uses: actions/upload-artifact@v4
         with:
           name: redmi-watch6-totp-debug

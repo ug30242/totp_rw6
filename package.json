@@ -1,7 +1,7 @@
 {
   "name": "com.vela.rw6totp",
-  "version": "1.0.3",
-  "description": "Redmi Watch 6 TOTP authenticator with a static web importer and encrypted relay",
+  "version": "1.1.0",
+  "description": "Redmi Watch 6 offline TOTP authenticator with on-watch entry and a local QR helper",
   "scripts": {
     "start": "aiot start",
     "build": "aiot build",
@@ -15,8 +15,10 @@
   },
   "devDependencies": {
     "aiot-toolkit": "2.0.5",
+    "jsqr": "1.4.0",
     "jszip": "3.10.1",
-    "playwright-core": "1.64.1"
+    "playwright-core": "1.64.1",
+    "qrcode": "1.5.4"
   },
   "engines": {
     "node": ">=24 <25"

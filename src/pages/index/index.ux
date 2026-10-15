@@ -9,7 +9,7 @@
 
     <div class="empty-box" if="{{ accounts.length === 0 }}">
       <text class="empty-text">No accounts yet.</text>
-      <text class="empty-sub">Tap + QR Add to get started.</text>
+      <text class="empty-sub">Tap + Add to get started.</text>
     </div>
 
     <list class="account-list" if="{{ accounts.length > 0 }}">
@@ -33,7 +33,7 @@
     </list>
 
     <div class="footer">
-      <input class="btn-add" type="button" value="+ QR Add" onclick="goAddPage" />
+      <input class="btn-add" type="button" value="+ Add" onclick="goAddPage" />
       <input class="btn-edit" type="button" value="{{ editMode ? 'Done' : 'Edit' }}" onclick="toggleEdit" />
     </div>
   </div>
@@ -180,7 +180,7 @@ export default {
   },
 
   goAddPage() {
-    router.push({ uri: 'pages/add' });
+    router.push({ uri: 'pages/manual' });
   }
 };
 </script>

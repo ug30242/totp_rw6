@@ -5,25 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="@@CSP@@">
-<title>Redmi Watch TOTP 계정 등록</title>
+<link rel="icon" href="data:,">
+<title>Redmi Watch TOTP 오프라인 등록 도우미</title>
 <style>@@STYLE@@</style>
 </head>
 <body>
 <main>
-<h1>워치에 TOTP 계정 등록</h1>
-<p>워치에서 [+ QR Add]를 누른 뒤 QR을 스캔하세요. 다운로드한 도구를 사용한다면 스캔한 URL을 아래에 붙여넣으세요. 키는 이 페이지에 저장하지 않습니다.</p>
+<h1>TOTP 오프라인 등록 도우미</h1>
+<p>기존 인증기의 OTP QR 이미지 또는 otpauth URI에서 워치에 입력할 값을 확인합니다. 이미지 읽기와 변환은 이 브라우저 안에서 실행됩니다. 이 파일은 다운로드한 뒤 인터넷 연결 없이 사용할 수 있습니다.</p>
 <form id="import-form">
-<label for="pairing">워치 QR의 URL</label>
-<input id="pairing" type="text" autocomplete="off" spellcheck="false" placeholder="https://ug30242.github.io/totp_rw6/#sid=…&amp;key=…" required>
-<label for="accounts">계정의 otpauth://totp/ URI (한 줄에 하나)</label>
-<textarea id="accounts" rows="7" autocomplete="off" spellcheck="false" placeholder="otpauth://totp/서비스:계정?secret=…" required></textarea>
-<p class="notice">계정 키를 가진 사람은 인증 코드를 생성할 수 있습니다. 신뢰하는 기기에서만 등록하세요. 이 도구는 외부 스크립트·분석 도구를 불러오지 않습니다.</p>
-<label class="consent"><input id="consent" type="checkbox">암호화한 패킷을 외부 릴레이 ntfy.sh에 전송하는 데 동의합니다. 릴레이가 네트워크 정보와 암호문을 보관할 수 있음을 이해했습니다.</label>
-<div class="buttons"><button type="submit" id="send">암호화해서 전송</button><button type="button" id="clear">모든 입력 지우기</button></div>
+<label for="qr-image">기존 OTP QR 이미지 읽기</label>
+<input id="qr-image" type="file" accept="image/png,image/jpeg,image/webp,image/bmp">
+<label for="accounts">또는 otpauth://totp/ URI 입력 (한 줄에 하나)</label>
+<textarea id="accounts" rows="5" autocomplete="off" spellcheck="false" placeholder="otpauth://totp/서비스:계정?secret=…" required></textarea>
+<p class="notice">아래 버튼을 누르면 인증키가 화면에 표시됩니다. 다른 사람이 화면을 보지 않는 곳에서 작업하고, 등록이 끝나면 입력을 지우세요. 원본 인증기와 복구 코드를 유지하세요.</p>
+<div class="buttons"><button type="submit" id="prepare">워치 입력 정보 보기</button><button type="button" id="clear">모든 입력 지우기</button></div>
 </form>
-<p id="status" role="status" aria-live="polite">워치의 세션은 5분 후 만료됩니다.</p>
-<details><summary>연결·보안 안내</summary><p>전송 후 워치에서 [Check]을 누르세요. 워치의 네트워크 연결과 Notify의 네트워크 중계 지원이 필요합니다. 실패하면 새 QR로 다시 시도하세요. 계정은 워치 로컬 저장소에 저장됩니다. 보안 저장소·암호화 보관을 보장하지 않습니다. 현재 RW6E1 전송 방식은 독립 보안 감사를 받지 않았으며 워치 페어링 난수의 암호학적 안전성도 확인되지 않았습니다. 원본 인증기의 계정과 복구 코드를 유지하세요.</p></details>
+<p id="status" role="status" aria-live="polite">워치에서 [+ Add]를 누르고 표시된 순서대로 입력하세요.</p>
+<section id="results" aria-label="워치 입력 정보"></section>
+<details><summary>등록 방법과 지원 범위</summary><p>워치의 [+ Add]에서 Secret → Name → Period → Review 순서로 입력하고 Save를 누릅니다. Secret의 공백은 건너뛰고 영문 A–Z와 숫자 2–7만 입력하세요. Name은 선택 사항이며 영문/숫자로 입력합니다. Period를 바꾸려면 워치에서 Clear를 누른 뒤 새 숫자를 입력합니다. Review에서 Hash와 Digits를 아래 정보와 일치시킵니다. 저장 후 원본 인증기와 코드가 같은지 확인하세요.</p><p>이 도구는 워치에 자동 전송하지 않습니다. Redmi Watch 6의 공개 API에는 브라우저에서 직접 쓸 수 있는 BLE 수신 기능이 없으며, 워치 QR을 휴대폰으로 읽는 것만으로 반대 방향 전송이 생기지는 않습니다. 기존 GitHub Pages 링크와 ntfy 중계는 현재 등록 경로에서 제거했습니다. Google Authenticator의 otpauth-migration과 암호화된 백업 형식은 지원하지 않습니다. 워치 키 입력 한도는 256자입니다. 계정은 워치의 일반 로컬 저장소에 보관됩니다.</p></details>
 </main>
+<script>@@QRDECODER@@</script>
 <script type="module">@@SCRIPT@@</script>
 </body>
 </html>

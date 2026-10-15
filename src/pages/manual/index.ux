@@ -1,0 +1,137 @@
+<template>
+  <div class="page">
+    <div class="header">
+      <text class="title">Add account</text>
+      <input class="close" type="button" value="Close" onclick="goBack" />
+    </div>
+    <div class="entry" if="{{ step < 3 }}">
+      <text class="label">{{ inputLabel }}</text>
+      <text class="preview">{{ previewText }}</text>
+      <div class="tools">
+        <input class="tool" type="button" value="Del" onclick="deleteChar" />
+        <input class="tool" type="button" value="Clear" onclick="clearField" />
+        <input class="tool" type="button" value="{{ showSecret ? 'Hide' : 'Show' }}" if="{{ step === 0 }}" onclick="toggleSecret" />
+        <input class="tool" type="button" value="{{ numberMode ? 'ABC' : '123' }}" if="{{ step === 1 }}" onclick="toggleNumbers" />
+      </div>
+      <div class="keyboard">
+        <div class="key-row" for="{{ (rowIndex, row) in keyRows }}">
+          <input class="key" type="button" for="{{ (keyIndex, letter) in row }}" value="{{ letter === ' ' ? 'SP' : letter }}" onclick="typeChar(letter)" />
+        </div>
+      </div>
+    </div>
+    <div class="review" if="{{ step === 3 }}">
+      <text class="label">Review account</text>
+      <text class="preview">{{ accountName || 'New account' }}</text>
+      <text class="label">Secret: {{ secret.length }} characters</text>
+      <input class="option" type="button" value="{{ 'Hash: ' + algorithm }}" onclick="cycleAlgorithm" />
+      <input class="option" type="button" value="{{ 'Digits: ' + digits }}" onclick="cycleDigits" />
+      <text class="label">Period: {{ periodText }} seconds</text>
+    </div>
+    <text class="status">{{ statusText }}</text>
+    <div class="footer">
+      <input class="nav" type="button" value="Back" onclick="previousStep" />
+      <input class="nav primary" type="button" value="{{ step === 3 ? (busy ? 'Saving...' : 'Save') : 'Next' }}" onclick="nextStep" />
+    </div>
+  </div>
+</template>
+
+<script>
+import router from '@system.router';
+import vibrator from '@system.vibrator';
+import { normalizeAccount } from '../../common/totp';
+import { appendAccounts } from '../../common/storage';
+
+export default {
+  private: {
+    step: 0, secret: '', accountName: '', periodText: '30',
+    algorithm: 'SHA1', digits: 6, showSecret: false, numberMode: false,
+    inputLabel: '', previewText: '', keyRows: [], statusText: '', busy: false
+  },
+  onInit() { this.updateInput(); },
+  onShow() { this._visible = true; },
+  onHide() { this._visible = false; },
+  onDestroy() { this._visible = false; this.secret = ''; this.accountName = ''; },
+  currentField() { return ['secret', 'accountName', 'periodText'][this.step]; },
+  updateInput() {
+    const rows = this.step === 0 ? ['ABCDEFGH', 'IJKLMNOP', 'QRSTUVWX', 'YZ234567']
+      : this.step === 2 || this.numberMode ? ['01234567', '89']
+      : ['ABCDEFGH', 'IJKLMNOP', 'QRSTUVWX', 'YZ .-_@'];
+    this.keyRows = rows.map(row => row.split(''));
+    this.inputLabel = ['Base32 secret', 'Account name (optional)', 'Period in seconds'][this.step] || '';
+    const value = this[this.currentField()] || '';
+    this.previewText = this.step === 0 && !this.showSecret
+      ? (value ? '*'.repeat(Math.min(value.length, 20)) + ' (' + value.length + ')' : 'Enter secret with the keys below')
+      : (value.length > 24 ? '...' + value.slice(-24) : value || '(empty)');
+  },
+  typeChar(letter) {
+    if (this.busy || this.step > 2 || typeof letter !== 'string' || letter.length !== 1) return;
+    const allowed = this.step === 0 ? /^[A-Z2-7]$/ : this.step === 1 ? /^[A-Z0-9 ._@-]$/ : /^[0-9]$/;
+    if (!allowed.test(letter)) return;
+    const field = this.currentField();
+    const limit = this.step === 0 ? 256 : this.step === 1 ? 64 : 4;
+    if (this[field].length >= limit) { this.statusText = 'Input length limit reached.'; return; }
+    this[field] += letter; this.statusText = ''; this.updateInput();
+  },
+  deleteChar() {
+    if (this.busy || this.step > 2) return;
+    const field = this.currentField(); this[field] = this[field].slice(0, -1); this.statusText = ''; this.updateInput();
+  },
+  clearField() {
+    if (this.busy || this.step > 2) return;
+    this[this.currentField()] = ''; this.statusText = ''; this.updateInput();
+  },
+  toggleSecret() { this.showSecret = !this.showSecret; this.updateInput(); },
+  toggleNumbers() { this.numberMode = !this.numberMode; this.updateInput(); },
+  previousStep() {
+    if (this.busy) return;
+    if (this.step === 0) { this.goBack(); return; }
+    this.step--; this.statusText = ''; this.updateInput();
+  },
+  async nextStep() {
+    if (this.busy) return;
+    try {
+      if (this.step === 0) normalizeAccount({secret:this.secret});
+      if (this.step === 2) normalizeAccount({secret:this.secret, period:this.periodText});
+      if (this.step < 3) { this.step++; this.statusText = ''; this.updateInput(); return; }
+      const account = normalizeAccount({name:this.accountName, secret:this.secret,
+        algorithm:this.algorithm, digits:this.digits, period:this.periodText});
+      this.busy = true;
+      await appendAccounts([account]);
+      this.secret = ''; this.accountName = '';
+      if (this._visible) {
+        try { vibrator.vibrate({mode:'short'}); } catch (_) {}
+        router.back();
+      }
+    } catch (e) { this.statusText = e.message || 'Cannot save account.'; }
+    finally { this.busy = false; }
+  },
+  cycleAlgorithm() {
+    if (this.busy) return;
+    const algorithms = ['SHA1', 'SHA256', 'SHA512'];
+    this.algorithm = algorithms[(algorithms.indexOf(this.algorithm) + 1) % algorithms.length];
+  },
+  cycleDigits() { if (!this.busy) this.digits = this.digits === 6 ? 8 : 6; },
+  goBack() { if (!this.busy) { this.secret = ''; this.accountName = ''; router.back(); } }
+};
+</script>
+
+<style>
+.page { width: 432px; height: 514px; padding: 12px 20px; flex-direction: column; background-color: #000000; }
+.header { width: 392px; height: 40px; flex-direction: row; justify-content: space-between; align-items: center; }
+.title { color: #f8fafc; font-size: 28px; }
+.close { width: 88px; height: 38px; background-color: #1e293b; color: #e2e8f0; font-size: 22px; border-radius: 16px; }
+.entry { width: 392px; flex-direction: column; }
+.label { color: #94a3b8; font-size: 21px; height: 28px; }
+.preview { width: 392px; height: 32px; color: #38bdf8; font-size: 23px; lines: 1; text-overflow: ellipsis; }
+.tools { width: 392px; height: 40px; flex-direction: row; justify-content: space-between; }
+.tool { width: 120px; height: 36px; background-color: #1e293b; color: #cbd5e1; font-size: 22px; border-radius: 8px; }
+.keyboard { width: 392px; height: 176px; flex-direction: column; }
+.key-row { width: 392px; height: 44px; flex-direction: row; justify-content: space-between; }
+.key { width: 46px; height: 40px; background-color: #1e293b; color: #f8fafc; font-size: 24px; border-radius: 8px; }
+.review { width: 392px; height: 276px; flex-direction: column; }
+.option { width: 392px; height: 52px; margin-bottom: 8px; background-color: #1e293b; color: #e2e8f0; font-size: 25px; border-radius: 12px; }
+.status { width: 392px; height: 58px; color: #fca5a5; font-size: 21px; }
+.footer { width: 392px; height: 48px; flex-direction: row; justify-content: space-between; }
+.nav { width: 184px; height: 46px; background-color: #1e293b; color: #f8fafc; font-size: 24px; border-radius: 18px; }
+.primary { background-color: #0284c7; }
+</style>

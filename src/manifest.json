@@ -2,16 +2,13 @@
   "package": "com.vela.rw6totp",
   "name": "TOTP",
   "icon": "/common/icon.png",
-  "versionName": "1.0.3",
-  "versionCode": 4,
+  "versionName": "1.1.0",
+  "versionCode": 5,
   "minAPILevel": 2,
   "deviceTypeList": [
     "watch"
   ],
   "features": [
-    {
-      "name": "system.fetch"
-    },
     {
       "name": "system.storage"
     },
@@ -34,9 +31,8 @@
         "path": "/index",
         "launchMode": "singleTask"
       },
-      "pages/add": {
-        "component": "index",
-        "path": "/add"
+      "pages/manual": {
+        "component": "index"
       }
     }
   },

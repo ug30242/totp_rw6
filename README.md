@@ -2,7 +2,7 @@
 
 중국판 Redmi Watch 6용 Xiaomi Vela 앱과 Android 동반 앱입니다. SHA-1 / SHA-256 / SHA-512, 6·8자리 OTP, 계정별 주기, 순서 변경·삭제를 지원합니다. 워치 UI는 기본 폰트에 맞춘 ASCII 영어를 사용합니다.
 
-## 1.2.0: QR 없이 Android에서 동기화
+## 1.2.1: QR 없이 Android에서 동기화
 
 **Android 앱에서 계정을 추가한 뒤 ‘워치로 동기화’를 누르세요.** QR이나 웹사이트, 계정 중계 서버가 필요하지 않습니다. QR 카메라·이미지·`otpauth` URI 가져오기는 기존 계정을 입력하는 선택 기능입니다.
 
@@ -10,10 +10,10 @@
 
 ## 설치와 사용
 
-[1.2.0 릴리스](https://github.com/ug30242/totp_rw6/releases/tag/v1.2.0)에서 **APK와 RPK를 함께** 받으세요.
+[1.2.1 릴리스](https://github.com/ug30242/totp_rw6/releases/tag/v1.2.1)에서 **APK와 RPK를 함께** 받으세요.
 
-1. `com.vela.rw6totp.release.1.2.0.rpk`를 Notify for Xiaomi의 **펌웨어 업데이트 → 타사 앱(RPK)**에서 설치합니다. 기존 앱을 삭제하지 않고 업데이트하세요. 앱 식별자·기존 서명·워치 저장소 키를 유지했습니다.
-2. Android 8.0 이상 휴대폰에 `rw6-totp-android-1.2.0.apk`를 설치합니다. 워치는 **Mi Fitness(중국판 운동건강)**에 연결되어 있어야 합니다. Notify는 RPK 설치에 사용할 수 있지만, Notify 단독 연결은 이 동기화 통신을 제공하지 않습니다.
+1. `com.vela.rw6totp.release.1.2.1.rpk`를 Notify for Xiaomi의 **펌웨어 업데이트 → 타사 앱(RPK)**에서 설치합니다. 기존 앱을 삭제하지 않고 업데이트하세요. 앱 식별자·기존 서명·워치 저장소 키를 유지했습니다.
+2. Android 8.0 이상 휴대폰에 `rw6-totp-android-1.2.1.apk`를 설치합니다. 워치는 **Mi Fitness(중국판 운동건강)**에 연결되어 있어야 합니다. Notify는 RPK 설치에 사용할 수 있지만, Notify 단독 연결은 이 동기화 통신을 제공하지 않습니다.
 3. Android의 **계정 직접 추가**에서 이름·Base32 인증키를 입력합니다. 기본은 SHA1 / 6자리 / 30초이며 원본 인증기의 설정과 맞추세요. **휴대폰에 저장**을 누릅니다. QR은 없어도 됩니다.
 4. **워치로 동기화**를 누릅니다. 처음에는 Mi Fitness의 기기 통신 권한을 허용하세요. 연결된 워치가 여러 개면 대상을 선택합니다. 앱이 워치 TOTP의 수신 화면을 열고 준비 응답을 받은 후 전송합니다.
 5. 자동 실행이 지원되지 않으면 워치에서 **TOTP → + Phone**을 직접 열고 다시 동기화하세요. 수신 화면이 열린 상태에서 동기화 요청을 자동 저장합니다. 워치에서 별도로 Save를 누를 필요가 없습니다.
@@ -40,8 +40,8 @@ npm ci
 npm test
 npm run test:web
 npm run build
-npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.2.0.rpk
-npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.2.0.rpk
+npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.2.1.rpk
+npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.2.1.rpk
 cd android
 ./gradlew --no-daemon :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease
 cd ..

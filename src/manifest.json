@@ -2,8 +2,8 @@
   "package": "com.vela.rw6totp",
   "name": "TOTP",
   "icon": "/common/icon.png",
-  "versionName": "1.2.0",
-  "versionCode": 6,
+  "versionName": "1.2.1",
+  "versionCode": 7,
   "minAPILevel": 2,
   "deviceTypeList": [
     "watch"

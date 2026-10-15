@@ -7,7 +7,7 @@ on:
       tag:
         description: Existing version tag to release
         required: true
-        default: v1.2.0
+        default: v1.2.1
 permissions:
   contents: write
 jobs:
@@ -28,6 +28,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
       - run: sdkmanager 'build-tools;35.0.0'
       - name: Verify signed packages and release payload
         shell: bash

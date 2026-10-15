@@ -21,7 +21,7 @@ npm run test:interop
 
 ```sh
 bash scripts/sign-apk.sh
-npm run verify:apk -- dist/rw6-totp-android-1.2.0.apk
+npm run verify:apk -- dist/rw6-totp-android-1.2.1.apk
 ```
 
 위 명령은 저장소 루트에서 실행합니다. 기존 `sign/release/{private,certificate}.pem`을 사용해 임시 PKCS12를 만들고 종료 시 지웁니다. 키·암호를 출력하거나 커밋하지 않습니다. 공개 인증서 `certificates/release.pem`과 APK 서명을 독립 비교합니다.

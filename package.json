@@ -1,6 +1,6 @@
 {
   "name": "com.vela.rw6totp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Redmi Watch 6 offline TOTP with an Android QR companion",
   "scripts": {
     "start": "aiot start",

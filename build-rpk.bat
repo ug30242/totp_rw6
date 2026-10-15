@@ -9,5 +9,8 @@ call npm run web:build
 if errorlevel 1 exit /b %errorlevel%
 call npm run release
 if errorlevel 1 exit /b %errorlevel%
-call npm run verify:rpk -- dist/com.vela.rw6totp.release.1.0.1.rpk
+for /f "delims=" %%v in ('node -p "require('./package.json').version"') do set "RPK_VERSION=%%v"
+call npm run verify:rpk -- dist/com.vela.rw6totp.release.%RPK_VERSION%.rpk
+if errorlevel 1 exit /b %errorlevel%
+call npm run smoke:rpk -- dist/com.vela.rw6totp.release.%RPK_VERSION%.rpk
 if errorlevel 1 exit /b %errorlevel%

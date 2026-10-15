@@ -4,9 +4,17 @@
 
 ## 설치
 
-[릴리스](https://github.com/ug30242/totp_rw6/releases)에서 **`com.vela.rw6totp.release.1.0.1.rpk`**를 다운로드하고 Notify for Xiaomi의 **펌웨어 업데이트 → 타사 앱(RPK)**에서 선택합니다. ZIP이나 소스 코드 압축파일을 선택하지 마세요. 태그의 `releases/v1.0.1/`에도 동일한 파일을 보관합니다.
+[릴리스](https://github.com/ug30242/totp_rw6/releases)에서 **`com.vela.rw6totp.release.1.0.2.rpk`**를 다운로드하고 Notify for Xiaomi의 **펌웨어 업데이트 → 타사 앱(RPK)**에서 선택합니다. ZIP이나 소스 코드 압축파일을 선택하지 마세요. 태그의 `releases/v1.0.2/`에도 동일한 파일을 보관합니다.
 
 첨부 원본 RPK는 서명에 포함된 콘텐츠 해시가 실제 패키지 내용과 달랐습니다. 공식 `aiot-toolkit 2.0.5`로 재빌드하고 외부·내부 서명, 패키지·파일 해시와 ZIP CRC를 검증했습니다. 중국판 펌웨어 **3.100.043**과 Notify for Xiaomi에서의 실제 전송·설치는 아직 검증하지 못했습니다. 상세 진단과 재설치 확인 절차는 [설치 안내](docs/notify-installation.md)에 있습니다.
+
+## 1.0.2 검은 화면 수정
+
+1.0.1은 설치 후 화면 초기화 시 `ReferenceError: exports is not defined`로 중단되는 결함이 있었습니다. 프로젝트의 `type: module` 설정과 aiot-toolkit의 CommonJS 중간 코드가 충돌해, RPK에 Node 전용 `exports`와 미번들 상대 `require()`가 남았습니다. 해당 설정을 제거해 내부 모듈이 정상 번들링되도록 수정했습니다. 앱 식별자·기존 서명키·저장소 키는 유지했습니다.
+
+서명 검증과 소스 단위 테스트만으로는 이 문제를 잡지 못했습니다. 이제 **실제 RPK의 app.js와 페이지 번들을 Node의 exports/require 없이 실행**해 진입점·첫 화면·초기 상태·저장된 OTP·저장 오류·QR 등록 화면 바인딩을 검사합니다. 이전 RPK는 같은 검사에서 실패하고 새 RPK는 통과합니다. 이 검사는 시스템 API와 VDOM을 모사하므로 네이티브 화면 렌더링·레이아웃·실기기 동작까지 입증하지는 않습니다.
+
+Node 24의 모듈 구문 자동 감지로 원본 ES 모듈을 테스트합니다. 이때 MODULE_TYPELESS_PACKAGE_JSON 경고가 나올 수 있습니다. **루트 package.json에 type: module을 다시 추가하지 마세요.** 앱 빌드의 CommonJS 중간 코드 처리와 충돌합니다.
 
 ## 계정 등록
 
@@ -29,7 +37,8 @@ npm ci
 npm test
 npm run test:web
 npm run build
-npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.0.1.rpk
+npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.0.2.rpk
+npm run smoke:rpk -- dist/com.vela.rw6totp.debug.1.0.2.rpk
 ```
 
 브라우저 테스트에는 Chromium 또는 Google Chrome이 필요합니다. 경로가 다르면 `CHROMIUM_PATH`로 지정합니다. GUI 에뮬레이터는 선택 사항이며 AIoT IDE/에뮬레이터를 설치한 환경에서 `npm start`를 사용할 수 있습니다. 클라우드에서는 빌드, 로직 테스트와 브라우저 테스트를 검증했습니다.

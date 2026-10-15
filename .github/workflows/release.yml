@@ -7,7 +7,7 @@ on:
       tag:
         description: Existing version tag to release
         required: true
-        default: v1.0.1
+        default: v1.0.2
 permissions:
   contents: write
 jobs:
@@ -32,6 +32,7 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           test "v$(node -p 'require("./package.json").version')" = "$RELEASE_TAG"
           npm run verify:rpk -- "releases/$RELEASE_TAG/"*.rpk
+          npm run smoke:rpk -- "releases/$RELEASE_TAG/"*.rpk
           cd "releases/$RELEASE_TAG"
           sha256sum -c SHA256SUMS
       - name: Publish exact verified artifacts

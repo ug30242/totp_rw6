@@ -5,10 +5,16 @@ const {verifyRpk}=require('../scripts/verify-rpk.cjs');
 test('the supplied RPK is rejected for a signed content digest mismatch',async()=>{
   await assert.rejects(verifyRpk(fs.readFileSync('tests/fixtures/original-invalid.rpk')),/RPK content digest mismatch/);
 });
-test('release has valid inner/outer signatures and the expected version and certificate',async()=>{
+test('v1.0.1 signatures remain valid independently of its startup failure',async()=>{
   const crypto=require('node:crypto');
   const result=await verifyRpk(fs.readFileSync('releases/v1.0.1/com.vela.rw6totp.release.1.0.1.rpk'));
   assert.equal(result.version,'1.0.1');assert.equal(result.versionCode,2);
+  assert.equal(result.certificate,new crypto.X509Certificate(fs.readFileSync('certificates/release.pem')).fingerprint256);
+});
+test('v1.0.2 has valid signatures and preserves the release signing identity',async()=>{
+  const crypto=require('node:crypto');
+  const result=await verifyRpk(fs.readFileSync('releases/v1.0.2/com.vela.rw6totp.release.1.0.2.rpk'));
+  assert.equal(result.version,'1.0.2');assert.equal(result.versionCode,3);
   assert.equal(result.certificate,new crypto.X509Certificate(fs.readFileSync('certificates/release.pem')).fingerprint256);
 });
 test('modified and truncated release archives fail verification',async()=>{

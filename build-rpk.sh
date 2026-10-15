@@ -5,4 +5,6 @@ npm ci
 npm test
 npm run web:build
 npm run release
-npm run verify:rpk -- dist/com.vela.rw6totp.release.1.0.1.rpk
+rpk_version=$(node -p "require('./package.json').version")
+npm run verify:rpk -- "dist/com.vela.rw6totp.release.${rpk_version}.rpk"
+npm run smoke:rpk -- "dist/com.vela.rw6totp.release.${rpk_version}.rpk"

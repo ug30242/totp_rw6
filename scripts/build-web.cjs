@@ -1,0 +1,11 @@
+const fs=require('node:fs');
+const crypto=require('node:crypto');
+const engine=fs.readFileSync('src/common/totp.js','utf8').replace(/export\s*\{[^}]*\};\s*$/, '');
+const script=engine+'\n'+fs.readFileSync('web/app.js','utf8');
+const style=fs.readFileSync('web/style.css','utf8');
+const hash=s=>crypto.createHash('sha256').update(s).digest('base64');
+const csp=`default-src 'none'; connect-src https://ntfy.sh; script-src 'sha256-${hash(script)}'; style-src 'sha256-${hash(style)}'; base-uri 'none'; form-action 'none'`;
+let html=fs.readFileSync('web/template.html','utf8');
+for (const [key,value] of Object.entries({CSP:csp,SCRIPT:script,STYLE:style})) html=html.replace('@@'+key+'@@',()=>value);
+fs.writeFileSync('web/index.html',html);
+console.log('Built standalone web/index.html (no external script dependencies)');

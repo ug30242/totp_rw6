@@ -1,0 +1,33 @@
+name: Validate app and RPK
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:web
+      - run: npm run build
+      - name: Verify official debug RPK signatures
+        run: npm run verify:rpk -- dist/com.vela.rw6totp.debug.1.0.1.rpk
+      - name: Verify committed release signatures and checksums
+        run: |
+          npm run verify:rpk -- releases/v1.0.1/*.rpk
+          cd releases/v1.0.1
+          sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: redmi-watch6-totp-debug
+          path: dist/*.rpk
+          if-no-files-found: error

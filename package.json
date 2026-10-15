@@ -1,0 +1,24 @@
+{
+  "name": "com.vela.rw6totp",
+  "version": "1.0.1",
+  "description": "Redmi Watch 6 TOTP authenticator with a static web importer and encrypted relay",
+  "scripts": {
+    "start": "aiot start",
+    "build": "aiot build",
+    "release": "aiot release",
+    "test": "node --test tests/*.test.*",
+    "verify:rpk": "node scripts/verify-rpk.cjs",
+    "web:build": "node scripts/build-web.cjs",
+    "check": "npm test && npm run web:build && npm run build",
+    "test:web": "npm run web:build && node --test e2e/*.test.cjs"
+  },
+  "devDependencies": {
+    "aiot-toolkit": "2.0.5",
+    "jszip": "3.10.1",
+    "playwright-core": "1.64.1"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

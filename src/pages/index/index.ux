@@ -1,0 +1,323 @@
+<template>
+  <div class="page">
+    <div class="header">
+      <text class="title">TOTP 인증기</text>
+      <text class="badge">{{ globalRemaining }}s</text>
+    </div>
+
+    <text class="error-text" if="{{ errorText }}">{{ errorText }}</text>
+
+    <div class="empty-box" if="{{ accounts.length === 0 }}">
+      <text class="empty-text">등록된 TOTP 계정이 없습니다.</text>
+      <text class="empty-sub">아래 [+ QR 웹 추가]를 눌러 등록하세요.</text>
+    </div>
+
+    <list class="account-list" if="{{ accounts.length > 0 }}">
+      <list-item type="account-card" class="card" for="{{ (idx, item) in renderedList }}">
+        <div class="card-top">
+          <text class="acc-name">{{ item.name }}</text>
+          <text class="acc-meta">{{ item.algorithm }} · {{ item.digits }}자리</text>
+        </div>
+
+        <div class="code-row">
+          <text class="otp-code">{{ item.formattedOtp }}</text>
+          <text class="{{ item.isExpiring ? 'rem-warn' : 'rem-ok' }}">{{ item.remaining }}s</text>
+        </div>
+
+        <div class="edit-row" if="{{ editMode }}">
+          <input class="act-btn" type="button" value="▲ 위로" onclick="onMoveUp(idx)" />
+          <input class="act-btn" type="button" value="▼ 아래로" onclick="onMoveDown(idx)" />
+          <input class="act-btn del-btn" type="button" value="{{ deleteIndex === idx ? '삭제 확인' : '✕ 삭제' }}" onclick="onDelete(idx)" />
+        </div>
+      </list-item>
+    </list>
+
+    <div class="footer">
+      <input class="btn-add" type="button" value="+ QR 웹 추가" onclick="goAddPage" />
+      <input class="btn-edit" type="button" value="{{ editMode ? '완료' : '순서/삭제' }}" onclick="toggleEdit" />
+    </div>
+  </div>
+</template>
+
+<script>
+import router from '@system.router';
+import vibrator from '@system.vibrator';
+import { generateTOTP } from '../../common/totp';
+import { loadAccounts, moveAccountOrder, removeAccountAt } from '../../common/storage';
+
+export default {
+  private: {
+    accounts: [],
+    renderedList: [],
+    editMode: false,
+    globalRemaining: 30,
+    timerId: null,
+    errorText: '',
+    deleteIndex: -1,
+    busy: false
+  },
+
+  onShow() {
+    this.refreshAccounts();
+    this.startTicker();
+  },
+
+  onHide() {
+    this.stopTicker();
+    this.deleteIndex = -1;
+  },
+
+  onDestroy() {
+    this.stopTicker();
+  },
+
+  async refreshAccounts() {
+    try {
+      this.accounts = await loadAccounts();
+      this.errorText = '';
+      this._otpCache = {};
+      this.updateOtps();
+    } catch (e) { this.errorText = e.message; }
+  },
+
+  startTicker() {
+    this.stopTicker();
+    this.updateOtps();
+    this.timerId = setInterval(() => {
+      this.updateOtps();
+    }, 1000);
+  },
+
+  stopTicker() {
+    if (this.timerId !== null) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+  },
+
+  formatOtp(otp) {
+    const s = String(otp || '');
+    if (s.length === 8) return s.slice(0, 4) + ' ' + s.slice(4);
+    return s.slice(0, 3) + ' ' + s.slice(3);
+  },
+
+  updateOtps() {
+    const timestamp = Date.now();
+    const nowSec = Math.floor(timestamp / 1000);
+    this.globalRemaining = 30 - (nowSec % 30);
+
+    const list = [];
+    for (let i = 0; i < this.accounts.length; i++) {
+      const acc = this.accounts[i];
+      try {
+        if (!this._otpCache) this._otpCache = {};
+        const cacheKey = acc.id || String(i);
+        const step = Math.floor(nowSec / acc.period);
+        let cached = this._otpCache[cacheKey];
+        if (!cached || cached.step !== step) {
+          cached = {step, result:generateTOTP(acc, timestamp)};
+          this._otpCache[cacheKey] = cached;
+        }
+        const res = cached.result;
+        const remaining = res.period - nowSec % res.period;
+        list.push({
+          id: acc.id,
+          name: acc.name,
+          algorithm: acc.algorithm || 'SHA1',
+          digits: acc.digits || 6,
+          formattedOtp: this.formatOtp(res.otp),
+          remaining,
+          isExpiring: remaining <= 5
+        });
+      } catch (_) {
+        list.push({
+          id: acc.id,
+          name: acc.name,
+          algorithm: acc.algorithm || 'SHA1',
+          digits: acc.digits || 6,
+          formattedOtp: 'ERR KEY',
+          remaining: 0,
+          isExpiring: true
+        });
+      }
+    }
+    this.renderedList = list;
+  },
+
+  toggleEdit() {
+    this.editMode = !this.editMode;
+    this.deleteIndex = -1;
+    vibrator.vibrate({ mode: 'short' });
+  },
+
+  async onMoveUp(idx) {
+    await this.changeAccounts(Number(idx), -1);
+  },
+
+  async onMoveDown(idx) {
+    await this.changeAccounts(Number(idx), 1);
+  },
+
+  async onDelete(idx) {
+    idx = Number(idx);
+    if (this.deleteIndex !== idx) { this.deleteIndex = idx; return; }
+    await this.changeAccounts(idx, 0);
+  },
+
+  async changeAccounts(idx, direction) {
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      this.accounts = direction ? await moveAccountOrder(idx, direction) : await removeAccountAt(idx);
+      this.deleteIndex = -1;
+      this.errorText = '';
+      this._otpCache = {};
+      this.updateOtps();
+      vibrator.vibrate({ mode: 'short' });
+    } catch (e) { this.errorText = e.message; }
+    finally { this.busy = false; }
+  },
+
+  goAddPage() {
+    router.push({ uri: 'pages/add' });
+  }
+};
+</script>
+
+<style>
+.page {
+  flex-direction: column;
+  width: 432px;
+  height: 514px;
+  background-color: #000000;
+  padding: 18px 20px 16px 20px;
+}
+.error-text {
+  color: #fca5a5;
+  font-size: 20px;
+}
+.header {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  height: 52px;
+  margin-bottom: 8px;
+}
+.title {
+  font-size: 30px;
+  font-weight: bold;
+  color: #f8fafc;
+}
+.badge {
+  font-size: 24px;
+  font-weight: bold;
+  color: #38bdf8;
+  background-color: #1e293b;
+  padding: 4px 16px;
+  border-radius: 20px;
+}
+.empty-box {
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.empty-text {
+  font-size: 26px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+.empty-sub {
+  font-size: 22px;
+  color: #64748b;
+}
+.account-list {
+  flex: 1;
+  flex-direction: column;
+}
+.card {
+  flex-direction: column;
+  background-color: #111827;
+  border-radius: 24px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+.card-top {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.acc-name {
+  font-size: 24px;
+  font-weight: bold;
+  color: #cbd5e1;
+  lines: 1;
+  text-overflow: ellipsis;
+  width: 240px;
+}
+.acc-meta {
+  font-size: 20px;
+  color: #64748b;
+}
+.code-row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+.otp-code {
+  font-size: 44px;
+  font-weight: bold;
+  color: #38bdf8;
+}
+.rem-ok {
+  font-size: 24px;
+  font-weight: bold;
+  color: #22c55e;
+}
+.rem-warn {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ef4444;
+}
+.edit-row {
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+.act-btn {
+  width: 112px;
+  height: 48px;
+  background-color: #1e293b;
+  color: #e2e8f0;
+  font-size: 22px;
+  border-radius: 14px;
+}
+.del-btn {
+  background-color: #450a0a;
+  color: #fca5a5;
+}
+.footer {
+  flex-direction: row;
+  justify-content: space-between;
+  height: 68px;
+  margin-top: 8px;
+}
+.btn-add {
+  width: 248px;
+  height: 64px;
+  background-color: #0284c7;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: bold;
+  border-radius: 32px;
+}
+.btn-edit {
+  width: 132px;
+  height: 64px;
+  background-color: #1e293b;
+  color: #cbd5e1;
+  font-size: 24px;
+  border-radius: 32px;
+}
+</style>

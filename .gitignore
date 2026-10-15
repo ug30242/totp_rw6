@@ -1,0 +1,10 @@
+node_modules/
+build/
+dist/
+sign/
+.npm/
+*.log
+.env
+.env.*
+!.env.example
+coverage/

@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src https://ntfy.sh; script-src 'sha256-2zSUzkMc56Z5Wml45sae2v2O5dGsdD0ZQ/YJzR3T2oM='; style-src 'sha256-m+iXZ4FHqDeWSv1H36PH4Uy0mTHW7WhfrAisM77M/3Y='; base-uri 'none'; form-action 'none'">
+<title>Redmi Watch TOTP 계정 등록</title>
+<style>:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0b1120;color:#e2e8f0}*{box-sizing:border-box}main{max-width:680px;margin:4vh auto;padding:24px}h1{font-size:1.8rem}p{line-height:1.7;color:#b6c4d8}label{display:block;margin-top:24px;font-weight:600}input[type=text],textarea{display:block;width:100%;margin-top:10px;border:1px solid #475569;border-radius:10px;padding:14px;background:#111c30;color:#f8fafc;font:inherit}textarea{resize:vertical;overflow-wrap:anywhere}.notice,details{font-size:.9rem}.consent{font-size:.9rem;line-height:1.6;font-weight:400}.buttons{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}button{border:0;border-radius:12px;padding:14px 20px;font:inherit;font-weight:600;background:#38bdf8;color:#071422;cursor:pointer}button:disabled{opacity:.5;cursor:wait}#clear{background:#334155;color:#f8fafc}#status{padding:16px;border:1px solid #334155;border-radius:10px;white-space:pre-wrap}input:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}details{line-height:1.7;margin-top:24px}summary{cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+<h1>워치에 TOTP 계정 등록</h1>
+<p>워치에서 [+ QR 웹 추가]를 누른 뒤 QR을 스캔하세요. 다운로드한 도구를 사용한다면 스캔한 URL을 아래에 붙여넣으세요. 키는 이 페이지에 저장하지 않습니다.</p>
+<form id="import-form">
+<label for="pairing">워치 QR의 URL</label>
+<input id="pairing" type="text" autocomplete="off" spellcheck="false" placeholder="https://ug30242.github.io/totp_rw6/#sid=…&amp;key=…" required>
+<label for="accounts">계정의 otpauth://totp/ URI (한 줄에 하나)</label>
+<textarea id="accounts" rows="7" autocomplete="off" spellcheck="false" placeholder="otpauth://totp/서비스:계정?secret=…" required></textarea>
+<p class="notice">계정 키를 가진 사람은 인증 코드를 생성할 수 있습니다. 신뢰하는 기기에서만 등록하세요. 이 도구는 외부 스크립트·분석 도구를 불러오지 않습니다.</p>
+<label class="consent"><input id="consent" type="checkbox">암호화한 패킷을 외부 릴레이 ntfy.sh에 전송하는 데 동의합니다. 릴레이가 네트워크 정보와 암호문을 보관할 수 있음을 이해했습니다.</label>
+<div class="buttons"><button type="submit" id="send">암호화해서 전송</button><button type="button" id="clear">모든 입력 지우기</button></div>
+</form>
+<p id="status" role="status" aria-live="polite">워치의 세션은 5분 후 만료됩니다.</p>
+<details><summary>연결·보안 안내</summary><p>전송 후 워치에서 [지금 수신 확인]을 누르세요. 워치의 네트워크 연결과 Notify의 네트워크 중계 지원이 필요합니다. 실패하면 새 QR로 다시 시도하세요. 계정은 워치 로컬 저장소에 저장됩니다. 보안 저장소·암호화 보관을 보장하지 않습니다. 현재 RW6E1 전송 방식은 독립 보안 감사를 받지 않았으며 워치 페어링 난수의 암호학적 안전성도 확인되지 않았습니다. 원본 인증기의 계정과 복구 코드를 유지하세요.</p></details>
+</main>
+<script type="module">// ============================================================================
+// Pure-JS RFC 6238 TOTP & HMAC-SHA256 E2EE Engine (SHA-1 / SHA-256 / SHA-512)
+// Compatible with Xiaomi Vela JS (QuickJS) & Modern Web Browsers
+// ============================================================================
+
+function base32ToBytes(base32) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const cleaned = String(base32 || '')
+    .toUpperCase()
+    .replace(/[\s-]+/g, '').replace(/=+$/, '');
+  if (!cleaned || cleaned.length > 1024 || ![0, 2, 4, 5, 7].includes(cleaned.length % 8)) {
+    throw new Error('잘못된 Base32 키 길이입니다.');
+  }
+
+  let bits = 0;
+  let value = 0;
+  const out = [];
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const idx = alphabet.indexOf(cleaned[i]);
+    if (idx === -1) {
+      throw new Error('유효하지 않은 Base32 문자입니다: ' + cleaned[i]);
+    }
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((value >>> bits) & 0xff);
+    }
+  }
+  if (bits && (value & ((1 << bits) - 1)) !== 0) throw new Error('잘못된 Base32 패딩 비트입니다.');
+  return new Uint8Array(out);
+}
+
+function normalizeAccount(account) {
+  if (!account || typeof account.secret !== 'string') throw new Error('계정의 키가 없습니다.');
+  const secret = account.secret.toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
+  base32ToBytes(secret);
+  const algorithm = String(account.algorithm || 'SHA1').toUpperCase().replace('-', '');
+  const digits = account.digits === undefined ? 6 : Number(account.digits);
+  const period = account.period === undefined ? 30 : Number(account.period);
+  if (!['SHA1', 'SHA256', 'SHA512'].includes(algorithm)) throw new Error('지원하지 않는 해시 알고리즘입니다.');
+  if (digits !== 6 && digits !== 8) throw new Error('OTP는 6자리 또는 8자리여야 합니다.');
+  if (!Number.isInteger(period) || period < 5 || period > 3600) throw new Error('주기는 5~3600초 정수여야 합니다.');
+  return {name:String(account.name || '새 계정').trim().slice(0, 64) || '새 계정', secret, algorithm, digits, period};
+}
+
+function rotr32(x, n) {
+  return (x >>> n) | (x << (32 - n));
+}
+
+function rotl32(x, n) {
+  return (x << n) | (x >>> (32 - n));
+}
+
+function sha1(msgBytes) {
+  const ml = msgBytes.length;
+  const bitLenHi = Math.floor((ml * 8) / 0x100000000);
+  const bitLenLo = (ml * 8) >>> 0;
+  const padLen = ((ml + 9 + 63) & ~63);
+  const buf = new Uint8Array(padLen);
+  buf.set(msgBytes);
+  buf[ml] = 0x80;
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(padLen - 8, bitLenHi, false);
+  dv.setUint32(padLen - 4, bitLenLo, false);
+
+  let h0 = 0x67452301, h1 = 0xefcdab89, h2 = 0x98badcfe, h3 = 0x10325476, h4 = 0xc3d2e1f0;
+  const w = new Uint32Array(80);
+
+  for (let offset = 0; offset < padLen; offset += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(offset + i * 4, false);
+    for (let i = 16; i < 80; i++) w[i] = rotl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1) >>> 0;
+
+    let a = h0, b = h1, c = h2, d = h3, e = h4;
+    for (let i = 0; i < 80; i++) {
+      let f, k;
+      if (i < 20) { f = (b & c) | (~b & d); k = 0x5a827999; }
+      else if (i < 40) { f = b ^ c ^ d; k = 0x6ed9eba1; }
+      else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = 0x8f1bbcdc; }
+      else { f = b ^ c ^ d; k = 0xca62c1d6; }
+      const temp = (rotl32(a, 5) + f + e + k + w[i]) >>> 0;
+      e = d; d = c; c = rotl32(b, 30) >>> 0; b = a; a = temp;
+    }
+    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0; h4 = (h4 + e) >>> 0;
+  }
+
+  const out = new Uint8Array(20);
+  const outDv = new DataView(out.buffer);
+  outDv.setUint32(0, h0, false); outDv.setUint32(4, h1, false); outDv.setUint32(8, h2, false);
+  outDv.setUint32(12, h3, false); outDv.setUint32(16, h4, false);
+  return out;
+}
+
+const SHA256_K = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+]);
+
+function sha256(msgBytes) {
+  const ml = msgBytes.length;
+  const bitLenHi = Math.floor((ml * 8) / 0x100000000);
+  const bitLenLo = (ml * 8) >>> 0;
+  const padLen = ((ml + 9 + 63) & ~63);
+  const buf = new Uint8Array(padLen);
+  buf.set(msgBytes);
+  buf[ml] = 0x80;
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(padLen - 8, bitLenHi, false);
+  dv.setUint32(padLen - 4, bitLenLo, false);
+
+  let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+  let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+  const w = new Uint32Array(64);
+
+  for (let offset = 0; offset < padLen; offset += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(offset + i * 4, false);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr32(w[i - 15], 7) ^ rotr32(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr32(w[i - 2], 17) ^ rotr32(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+
+    let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + S1 + ch + SHA256_K[i] + w[i]) >>> 0;
+      const S0 = rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (S0 + maj) >>> 0;
+
+      h = g; g = f; f = e; e = (d + temp1) >>> 0;
+      d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+    }
+    h0 = (h0 + a) >>> 0; h1 = (h1 + b) >>> 0; h2 = (h2 + c) >>> 0; h3 = (h3 + d) >>> 0;
+    h4 = (h4 + e) >>> 0; h5 = (h5 + f) >>> 0; h6 = (h6 + g) >>> 0; h7 = (h7 + h) >>> 0;
+  }
+
+  const out = new Uint8Array(32);
+  const outDv = new DataView(out.buffer);
+  outDv.setUint32(0, h0, false); outDv.setUint32(4, h1, false); outDv.setUint32(8, h2, false); outDv.setUint32(12, h3, false);
+  outDv.setUint32(16, h4, false); outDv.setUint32(20, h5, false); outDv.setUint32(24, h6, false); outDv.setUint32(28, h7, false);
+  return out;
+}
+
+const SHA512_K = [
+  [0x428a2f98, 0xd728ae22], [0x71374491, 0x23ef65cd], [0xb5c0fbcf, 0xec4d3b2f], [0xe9b5dba5, 0x8189dbbc],
+  [0x3956c25b, 0xf348b538], [0x59f111f1, 0xb605d019], [0x923f82a4, 0xaf194f9b], [0xab1c5ed5, 0xda6d8118],
+  [0xd807aa98, 0xa3030242], [0x12835b01, 0x45706fbe], [0x243185be, 0x4ee4b28c], [0x550c7dc3, 0xd5ffb4e2],
+  [0x72be5d74, 0xf27b896f], [0x80deb1fe, 0x3b1696b1], [0x9bdc06a7, 0x25c71235], [0xc19bf174, 0xcf692694],
+  [0xe49b69c1, 0x9ef14ad2], [0xefbe4786, 0x384f25e3], [0x0fc19dc6, 0x8b8cd5b5], [0x240ca1cc, 0x77ac9c65],
+  [0x2de92c6f, 0x592b0275], [0x4a7484aa, 0x6ea6e483], [0x5cb0a9dc, 0xbd41fbd4], [0x76f988da, 0x831153b5],
+  [0x983e5152, 0xee66dfab], [0xa831c66d, 0x2db43210], [0xb00327c8, 0x98fb213f], [0xbf597fc7, 0xbeef0ee4],
+  [0xc6e00bf3, 0x3da88fc2], [0xd5a79147, 0x930aa725], [0x06ca6351, 0xe003826f], [0x14292967, 0x0a0e6e70],
+  [0x27b70a85, 0x46d22ffc], [0x2e1b2138, 0x5c26c926], [0x4d2c6dfc, 0x5ac42aed], [0x53380d13, 0x9d95b3df],
+  [0x650a7354, 0x8baf63de], [0x766a0abb, 0x3c77b2a8], [0x81c2c92e, 0x47edaee6], [0x92722c85, 0x1482353b],
+  [0xa2bfe8a1, 0x4cf10364], [0xa81a664b, 0xbc423001], [0xc24b8b70, 0xd0f89791], [0xc76c51a3, 0x0654be30],
+  [0xd192e819, 0xd6ef5218], [0xd6990624, 0x5565a910], [0xf40e3585, 0x5771202a], [0x106aa070, 0x32bbd1b8],
+  [0x19a4c116, 0xb8d2d0c8], [0x1e376c08, 0x5141ab53], [0x2748774c, 0xdf8eeb99], [0x34b0bcb5, 0xe19b48a8],
+  [0x391c0cb3, 0xc5c95a63], [0x4ed8aa4a, 0xe3418acb], [0x5b9cca4f, 0x7763e373], [0x682e6ff3, 0xd6b2b8a3],
+  [0x748f82ee, 0x5defb2fc], [0x78a5636f, 0x43172f60], [0x84c87814, 0xa1f0ab72], [0x8cc70208, 0x1a6439ec],
+  [0x90befffa, 0x23631e28], [0xa4506ceb, 0xde82bde9], [0xbef9a3f7, 0xb2c67915], [0xc67178f2, 0xe372532b],
+  [0xca273ece, 0xea26619c], [0xd186b8c7, 0x21c0c207], [0xeada7dd6, 0xcde0eb1e], [0xf57d4f7f, 0xee6ed178],
+  [0x06f067aa, 0x72176fba], [0x0a637dc5, 0xa2c898a6], [0x113f9804, 0xbef90dae], [0x1b710b35, 0x131c471b],
+  [0x28db77f5, 0x23047d84], [0x32caab7b, 0x40c72493], [0x3c9ebe0a, 0x15c9bebc], [0x431d67c4, 0x9c100d4c],
+  [0x4cc5d4be, 0xcb3e42b6], [0x597f299c, 0xfc657e2a], [0x5fcb6fab, 0x3ad6faec], [0x6c44198c, 0x4a475817]
+];
+
+function add64(ah, al, bh, bl) {
+  const l = (al >>> 0) + (bl >>> 0);
+  const h = ((ah >>> 0) + (bh >>> 0) + (l > 0xffffffff ? 1 : 0)) >>> 0;
+  return [h, l >>> 0];
+}
+
+function rotr64(xh, xl, n) {
+  if (n < 32) {
+    return [((xh >>> n) | (xl << (32 - n))) >>> 0, ((xl >>> n) | (xh << (32 - n))) >>> 0];
+  }
+  const k = n - 32;
+  return [((xl >>> k) | (xh << (32 - k))) >>> 0, ((xh >>> k) | (xl << (32 - k))) >>> 0];
+}
+
+function shr64(xh, xl, n) {
+  if (n < 32) {
+    return [xh >>> n, ((xl >>> n) | (xh << (32 - n))) >>> 0];
+  }
+  return [0, xh >>> (n - 32)];
+}
+
+function sha512(msgBytes) {
+  const ml = msgBytes.length;
+  const bitLenHi = Math.floor((ml * 8) / 0x100000000);
+  const bitLenLo = (ml * 8) >>> 0;
+  const padLen = ((ml + 17 + 127) & ~127);
+  const buf = new Uint8Array(padLen);
+  buf.set(msgBytes);
+  buf[ml] = 0x80;
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(padLen - 8, bitLenHi, false);
+  dv.setUint32(padLen - 4, bitLenLo, false);
+
+  let H = [
+    [0x6a09e667, 0xf3bcc908], [0xbb67ae85, 0x84caa73b],
+    [0x3c6ef372, 0xfe94f82b], [0xa54ff53a, 0x5f1d36f1],
+    [0x510e527f, 0xade682d1], [0x9b05688c, 0x2b3e6c1f],
+    [0x1f83d9ab, 0xfb41bd6b], [0x5be0cd19, 0x137e2179]
+  ];
+
+  const wh = new Uint32Array(80);
+  const wl = new Uint32Array(80);
+
+  for (let offset = 0; offset < padLen; offset += 128) {
+    for (let i = 0; i < 16; i++) {
+      wh[i] = dv.getUint32(offset + i * 8, false);
+      wl[i] = dv.getUint32(offset + i * 8 + 4, false);
+    }
+    for (let i = 16; i < 80; i++) {
+      const r1 = rotr64(wh[i - 15], wl[i - 15], 1);
+      const r8 = rotr64(wh[i - 15], wl[i - 15], 8);
+      const s7 = shr64(wh[i - 15], wl[i - 15], 7);
+      const s0h = (r1[0] ^ r8[0] ^ s7[0]) >>> 0;
+      const s0l = (r1[1] ^ r8[1] ^ s7[1]) >>> 0;
+
+      const r19 = rotr64(wh[i - 2], wl[i - 2], 19);
+      const r61 = rotr64(wh[i - 2], wl[i - 2], 61);
+      const s6 = shr64(wh[i - 2], wl[i - 2], 6);
+      const s1h = (r19[0] ^ r61[0] ^ s6[0]) >>> 0;
+      const s1l = (r19[1] ^ r61[1] ^ s6[1]) >>> 0;
+
+      let t = add64(wh[i - 16], wl[i - 16], s0h, s0l);
+      t = add64(t[0], t[1], wh[i - 7], wl[i - 7]);
+      t = add64(t[0], t[1], s1h, s1l);
+      wh[i] = t[0];
+      wl[i] = t[1];
+    }
+
+    let [ah, al] = H[0], [bh, bl] = H[1], [ch, cl] = H[2], [dh, dl] = H[3];
+    let [eh, el] = H[4], [fh, fl] = H[5], [gh, gl] = H[6], [hh, hl] = H[7];
+
+    for (let i = 0; i < 80; i++) {
+      const e14 = rotr64(eh, el, 14);
+      const e18 = rotr64(eh, el, 18);
+      const e41 = rotr64(eh, el, 41);
+      const S1h = (e14[0] ^ e18[0] ^ e41[0]) >>> 0;
+      const S1l = (e14[1] ^ e18[1] ^ e41[1]) >>> 0;
+
+      const chh = ((eh & fh) ^ (~eh & gh)) >>> 0;
+      const chl = ((el & fl) ^ (~el & gl)) >>> 0;
+
+      let t1 = add64(hh, hl, S1h, S1l);
+      t1 = add64(t1[0], t1[1], chh, chl);
+      t1 = add64(t1[0], t1[1], SHA512_K[i][0], SHA512_K[i][1]);
+      t1 = add64(t1[0], t1[1], wh[i], wl[i]);
+
+      const a28 = rotr64(ah, al, 28);
+      const a34 = rotr64(ah, al, 34);
+      const a39 = rotr64(ah, al, 39);
+      const S0h = (a28[0] ^ a34[0] ^ a39[0]) >>> 0;
+      const S0l = (a28[1] ^ a34[1] ^ a39[1]) >>> 0;
+
+      const majh = ((ah & bh) ^ (ah & ch) ^ (bh & ch)) >>> 0;
+      const majl = ((al & bl) ^ (al & cl) ^ (bl & cl)) >>> 0;
+      const t2 = add64(S0h, S0l, majh, majl);
+
+      hh = gh; hl = gl;
+      gh = fh; gl = fl;
+      fh = eh; fl = el;
+      const ne = add64(dh, dl, t1[0], t1[1]);
+      eh = ne[0]; el = ne[1];
+      dh = ch; dl = cl;
+      ch = bh; cl = bl;
+      bh = ah; bl = al;
+      const na = add64(t1[0], t1[1], t2[0], t2[1]);
+      ah = na[0]; al = na[1];
+    }
+
+    H[0] = add64(H[0][0], H[0][1], ah, al);
+    H[1] = add64(H[1][0], H[1][1], bh, bl);
+    H[2] = add64(H[2][0], H[2][1], ch, cl);
+    H[3] = add64(H[3][0], H[3][1], dh, dl);
+    H[4] = add64(H[4][0], H[4][1], eh, el);
+    H[5] = add64(H[5][0], H[5][1], fh, fl);
+    H[6] = add64(H[6][0], H[6][1], gh, gl);
+    H[7] = add64(H[7][0], H[7][1], hh, hl);
+  }
+
+  const out = new Uint8Array(64);
+  const outDv = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) {
+    outDv.setUint32(i * 8, H[i][0], false);
+    outDv.setUint32(i * 8 + 4, H[i][1], false);
+  }
+  return out;
+}
+
+function hmac(algo, keyBytes, msgBytes) {
+  const normAlgo = String(algo || 'SHA1').toUpperCase().replace('-', '');
+  const hashFn = normAlgo === 'SHA512' ? sha512 : (normAlgo === 'SHA256' ? sha256 : sha1);
+  const blockSize = normAlgo === 'SHA512' ? 128 : 64;
+
+  let k = keyBytes;
+  if (k.length > blockSize) {
+    k = hashFn(k);
+  }
+  const ipad = new Uint8Array(blockSize);
+  const opad = new Uint8Array(blockSize);
+  for (let i = 0; i < blockSize; i++) {
+    const b = i < k.length ? k[i] : 0;
+    ipad[i] = b ^ 0x36;
+    opad[i] = b ^ 0x5c;
+  }
+
+  const innerInput = new Uint8Array(blockSize + msgBytes.length);
+  innerInput.set(ipad, 0);
+  innerInput.set(msgBytes, blockSize);
+  const innerHash = hashFn(innerInput);
+
+  const outerInput = new Uint8Array(blockSize + innerHash.length);
+  outerInput.set(opad, 0);
+  outerInput.set(innerHash, blockSize);
+  return hashFn(outerInput);
+}
+
+function generateTOTP(account, timestampMs) {
+  account = normalizeAccount(account);
+  const nowSec = Math.floor((timestampMs !== undefined ? timestampMs : Date.now()) / 1000);
+  if (!Number.isSafeInteger(nowSec) || nowSec < 0) throw new Error('잘못된 시간입니다.');
+  const {period, digits, algorithm} = account;
+  const counter = Math.floor(nowSec / period);
+
+  const counterBytes = new Uint8Array(8);
+  let tmp = counter;
+  for (let i = 7; i >= 0; i--) {
+    counterBytes[i] = tmp & 0xff;
+    tmp = Math.floor(tmp / 256);
+  }
+
+  const keyBytes = base32ToBytes(account.secret);
+  if (keyBytes.length === 0) {
+    throw new Error('비어 있거나 잘못된 시크릿 키입니다.');
+  }
+  const digest = hmac(algorithm, keyBytes, counterBytes);
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff);
+
+  const mod = Math.pow(10, digits);
+  const otp = (binary % mod).toString().padStart(digits, '0');
+  const remaining = period - (nowSec % period);
+  return { otp, remaining, period, digits, algorithm };
+}
+
+function utf8ToBytes(str) {
+  const bytes = [];
+  for (let i = 0; i < str.length; i++) {
+    let c = str.charCodeAt(i);
+    if (c < 0x80) {
+      bytes.push(c);
+    } else if (c < 0x800) {
+      bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+      const c2 = str.charCodeAt(++i);
+      const cp = 0x10000 + (((c & 0x3ff) << 10) | (c2 & 0x3ff));
+      bytes.push(
+        0xf0 | (cp >> 18),
+        0x80 | ((cp >> 12) & 0x3f),
+        0x80 | ((cp >> 6) & 0x3f),
+        0x80 | (cp & 0x3f)
+      );
+    } else {
+      bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+function bytesToUtf8(bytes) {
+  let out = '';
+  let i = 0;
+  while (i < bytes.length) {
+    const b1 = bytes[i++];
+    if (b1 < 0x80) {
+      out += String.fromCharCode(b1);
+    } else if ((b1 & 0xe0) === 0xc0) {
+      const b2 = bytes[i++] & 0x3f;
+      out += String.fromCharCode(((b1 & 0x1f) << 6) | b2);
+    } else if ((b1 & 0xf0) === 0xe0) {
+      const b2 = bytes[i++] & 0x3f;
+      const b3 = bytes[i++] & 0x3f;
+      out += String.fromCharCode(((b1 & 0x0f) << 12) | (b2 << 6) | b3);
+    } else {
+      const b2 = bytes[i++] & 0x3f;
+      const b3 = bytes[i++] & 0x3f;
+      const b4 = bytes[i++] & 0x3f;
+      const cp = (((b1 & 0x07) << 18) | (b2 << 12) | (b3 << 6) | b4) - 0x10000;
+      out += String.fromCharCode(0xd800 + (cp >> 10), 0xdc00 + (cp & 0x3ff));
+    }
+  }
+  return out;
+}
+
+function bytesToHex(bytes) {
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i].toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+function hexToBytes(hex) {
+  const clean = String(hex || '');
+  if (!clean || clean.length % 2 || !/^[0-9a-f]+$/i.test(clean)) throw new Error('잘못된 16진수 데이터입니다.');
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.substr(i * 2, 2), 16);
+  }
+  return out;
+}
+
+function encryptPayload(obj, secretKeyStr) {
+  const plainBytes = utf8ToBytes(JSON.stringify(obj));
+  const keyBytes = utf8ToBytes(String(secretKeyStr || '').trim().toUpperCase());
+  if (!keyBytes.length || plainBytes.length > 24000) throw new Error('키 또는 데이터 크기를 확인하세요.');
+  // Encryption happens in the browser companion. Never fall back to Math.random.
+  if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+    throw new Error('보안 난수 생성기가 필요합니다.');
+  }
+  const nonce = crypto.getRandomValues(new Uint8Array(8));
+
+  const cipherBytes = new Uint8Array(plainBytes.length);
+  let blockIdx = 0;
+  let offset = 0;
+  while (offset < plainBytes.length) {
+    const blockInput = new Uint8Array(12);
+    blockInput.set(nonce, 0);
+    const dv = new DataView(blockInput.buffer);
+    dv.setUint32(8, blockIdx++, false);
+    const keystream = hmac('SHA256', keyBytes, blockInput);
+    for (let i = 0; i < keystream.length && offset < plainBytes.length; i++, offset++) {
+      cipherBytes[offset] = plainBytes[offset] ^ keystream[i];
+    }
+  }
+
+  const macInput = new Uint8Array(nonce.length + cipherBytes.length);
+  macInput.set(nonce, 0);
+  macInput.set(cipherBytes, nonce.length);
+  const macTag = hmac('SHA256', keyBytes, macInput).slice(0, 16);
+
+  return 'RW6E1:' + bytesToHex(nonce) + ':' + bytesToHex(macTag) + ':' + bytesToHex(cipherBytes);
+}
+
+function decryptPayload(packetStr, secretKeyStr) {
+  const packet = String(packetStr || '').trim();
+  if (packet.length > 48100) throw new Error('패킷이 너무 큽니다.');
+  const parts = packet.split(':');
+  if (parts.length !== 4 || parts[0] !== 'RW6E1') {
+    throw new Error('올바르지 않은 암호화 패킷 형식입니다.');
+  }
+  const nonce = hexToBytes(parts[1]);
+  const macTag = hexToBytes(parts[2]);
+  const cipherBytes = hexToBytes(parts[3]);
+  const keyBytes = utf8ToBytes(String(secretKeyStr || '').trim().toUpperCase());
+  if (nonce.length !== 8 || macTag.length !== 16 || !keyBytes.length) throw new Error('잘못된 키 또는 패킷 길이입니다.');
+
+  const macInput = new Uint8Array(nonce.length + cipherBytes.length);
+  macInput.set(nonce, 0);
+  macInput.set(cipherBytes, nonce.length);
+  const expectedMac = hmac('SHA256', keyBytes, macInput).slice(0, 16);
+
+  let diff = 0;
+  for (let i = 0; i < 16; i++) {
+    diff |= (macTag[i] ^ expectedMac[i]);
+  }
+  if (diff !== 0) {
+    throw new Error('일회용 암호화 키가 일치하지 않거나 데이터가 손상되었습니다.');
+  }
+
+  const plainBytes = new Uint8Array(cipherBytes.length);
+  let blockIdx = 0;
+  let offset = 0;
+  while (offset < cipherBytes.length) {
+    const blockInput = new Uint8Array(12);
+    blockInput.set(nonce, 0);
+    const dv = new DataView(blockInput.buffer);
+    dv.setUint32(8, blockIdx++, false);
+    const keystream = hmac('SHA256', keyBytes, blockInput);
+    for (let i = 0; i < keystream.length && offset < cipherBytes.length; i++, offset++) {
+      plainBytes[offset] = cipherBytes[offset] ^ keystream[i];
+    }
+  }
+
+  return JSON.parse(bytesToUtf8(plainBytes));
+}
+
+function parseOtpAuthUri(uriStr) {
+  const raw = String(uriStr || '').trim();
+  if (!raw.toLowerCase().startsWith('otpauth://')) {
+    throw new Error('otpauth:// 로 시작하는 유효한 TOTP QR URI가 아닙니다.');
+  }
+  // URL/URLSearchParams are not available on all Vela JS runtimes.
+  const match = /^otpauth:\/\/([^/]+)\/([^?]*)\?([^#]*)(?:#.*)?$/i.exec(raw);
+  if (!match) throw new Error('올바르지 않은 OTP URI입니다.');
+  const type = match[1].toLowerCase();
+  if (type !== 'totp') {
+    throw new Error('TOTP 형식(otpauth://totp/...)만 지원합니다.');
+  }
+  const labelPath = decodeURIComponent(match[2]);
+  const values = Object.create(null);
+  match[3].split('&').forEach(pair => {
+    const at = pair.indexOf('=');
+    const key = decodeURIComponent(at < 0 ? pair : pair.slice(0, at));
+    const value = decodeURIComponent((at < 0 ? '' : pair.slice(at + 1)).replace(/\+/g, ' '));
+    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error('중복 OTP 파라미터입니다.');
+    values[key] = value;
+  });
+  const params = {get: key => values[key]};
+  const secret = (params.get('secret') || '').toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
+  if (!secret) {
+    throw new Error('QR 코드에 secret 파라미터가 없습니다.');
+  }
+  base32ToBytes(secret); // validate Base32
+
+  let issuer = params.get('issuer') || '';
+  let accountName = labelPath;
+  if (labelPath.includes(':')) {
+    const splitIdx = labelPath.indexOf(':');
+    const prefix = labelPath.slice(0, splitIdx).trim();
+    accountName = labelPath.slice(splitIdx + 1).trim();
+    if (!issuer) issuer = prefix;
+  }
+  const displayName = issuer && accountName && !accountName.toLowerCase().startsWith(issuer.toLowerCase())
+    ? `${issuer} (${accountName})`
+    : (accountName || issuer || '새 계정');
+
+  const rawAlgo = (params.get('algorithm') || 'SHA1').toUpperCase().replace('-', '');
+  const account = normalizeAccount({
+    name: displayName,
+    secret,
+    algorithm:rawAlgo,
+    digits:params.get('digits') === undefined ? 6 : params.get('digits'),
+    period:params.get('period') === undefined ? 30 : params.get('period')
+  });
+  return {...account, issuer:issuer || ''};
+}
+
+
+const form = document.getElementById('import-form');
+const pairing = document.getElementById('pairing');
+const accountsInput = document.getElementById('accounts');
+const consent = document.getElementById('consent');
+const send = document.getElementById('send');
+const status = document.getElementById('status');
+let generation = 0;
+let controller = null;
+
+function readPairing(value) {
+  const url = new URL(value.trim());
+  const params = new URLSearchParams(url.hash.slice(1));
+  const sid = params.get('sid') || '';
+  const key = params.get('key') || '';
+  if (!/^RW6[A-HJ-NP-Z2-9]{16}$/.test(sid) || !/^[A-HJ-NP-Z2-9]{20}$/.test(key)) {
+    throw new Error('워치에서 새 QR을 생성하고 전체 URL을 입력하세요.');
+  }
+  return {sid, key};
+}
+if (location.hash) {
+  try { readPairing(location.href); pairing.value = location.href; }
+  catch (_) { status.textContent = 'QR URL을 확인하세요.'; }
+  // Do not leave session material in browser history or referrers.
+  try { history.replaceState(null, '', location.pathname); } catch (_) {}
+}
+function clearInputs() {
+  generation++;
+  if (controller) controller.abort();
+  controller = null; form.reset(); send.disabled = false;
+  status.textContent = '모든 입력을 지웠습니다.';
+}
+document.getElementById('clear').addEventListener('click', clearInputs);
+window.addEventListener('pagehide', clearInputs);
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (send.disabled) return;
+  const requestGeneration = ++generation;
+  try {
+    if (!consent.checked) throw new Error('외부 릴레이 전송 동의를 확인하세요.');
+    const {sid, key} = readPairing(pairing.value);
+    const uris = accountsInput.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!uris.length || uris.length > 50) throw new Error('한 번에 1~50개 URI를 입력하세요.');
+    const accounts = uris.map(parseOtpAuthUri);
+    const packet = encryptPayload({sid, expiresAt:Date.now() + 300000, accounts}, key);
+    if (packet.length > 4000) throw new Error('릴레이 크기 제한입니다. 계정을 나누어 등록하세요.');
+    send.disabled = true;
+    status.textContent = '암호화한 계정 데이터를 전송하는 중…';
+    const requestController = new AbortController();
+    controller = requestController;
+    const timeout = setTimeout(() => requestController.abort(), 15000);
+    let response;
+    try {
+      response = await fetch('https://ntfy.sh/rw6_totp_' + sid, {
+        method:'POST', headers:{'Content-Type':'text/plain'}, body:packet,
+        credentials:'omit', referrerPolicy:'no-referrer', signal:requestController.signal
+      });
+    } finally { clearTimeout(timeout); }
+    if (!response.ok) throw new Error('릴레이 전송 실패 (HTTP ' + response.status + ')');
+    if (requestGeneration !== generation) return;
+    accountsInput.value = '';
+    status.textContent = '전송 완료. 워치에서 [지금 수신 확인]을 누르세요.\n등록이 확인되면 이 페이지의 입력을 모두 지우세요.';
+  } catch (e) {
+    if (requestGeneration === generation) status.textContent = e.name === 'AbortError' ? '전송 시간이 초과되었습니다. 연결 상태를 확인하세요.' : e.message;
+  } finally {
+    if (requestGeneration === generation) { send.disabled = false; controller = null; }
+  }
+});
+</script>
+</body>
+</html>

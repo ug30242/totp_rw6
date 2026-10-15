@@ -1,0 +1,12 @@
+<script>
+export default {
+  onCreate() {
+    console.log('Redmi Watch 6 TOTP App initialized');
+  },
+  onDestroy() {
+    if (global && typeof global.runGC === 'function') {
+      global.runGC();
+    }
+  }
+};
+</script>

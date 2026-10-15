@@ -1,0 +1,50 @@
+name: Publish verified release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release
+        required: true
+        default: v1.0.1
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Verify signed packages and release payload
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "v$(node -p 'require("./package.json").version')" = "$RELEASE_TAG"
+          npm run verify:rpk -- "releases/$RELEASE_TAG/"*.rpk
+          cd "releases/$RELEASE_TAG"
+          sha256sum -c SHA256SUMS
+      - name: Publish exact verified artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; preserving its assets."
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" "releases/$RELEASE_TAG/"*.rpk "releases/$RELEASE_TAG/totp-import.html" "releases/$RELEASE_TAG/SHA256SUMS" \
+            --verify-tag --title "Redmi Watch 6 TOTP $RELEASE_TAG" --notes-file "releases/$RELEASE_TAG/NOTES.md"

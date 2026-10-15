@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const JSZip = require('jszip');
 
-async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs} = {}) {
+async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs, overlapReceivePages = false} = {}) {
   const zip = await JSZip.loadAsync(buffer);
   const manifest = JSON.parse(await zip.file('manifest.json').async('string'));
   const trees = {};
@@ -63,7 +63,13 @@ async function smokeRpk(buffer, {accounts = [], failStorage = false, timestampMs
     // The first frame must render before storage callbacks and onShow complete.
     const firstFrame = definition.template(page);
     assert.equal(firstFrame.tag,'div');
+    let previousPage;
+    if (overlapReceivePages && route === 'pages/receive') {
+      previousPage = Object.assign({},definition,definition.data);
+      await previousPage.onShow();
+    }
     if (page.onShow) await page.onShow();
+    if (previousPage) previousPage.onDestroy();
     await new Promise(resolve=>setImmediate(resolve));
     const tree = definition.template(page);
     const nodes = [];

@@ -21,7 +21,7 @@ function verifyApk(file,{tools=path.join(process.env.ANDROID_HOME||process.env.A
   assert(metadata.includes("targetSdkVersion:'35'"),'Unexpected Android target');
   assert(metadata.includes("launchable-activity: name='com.vela.rw6totp.MainActivity'"),'Missing launcher');
   const permissions=execFileSync(path.join(tools,'aapt'),['dump','permissions',file],{encoding:'utf8'});
-  assert(!/android\.permission\.(INTERNET|ACCESS_NETWORK_STATE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE)/.test(permissions),'Unexpected network/storage permission');
+  assert(!/android\.permission\.(INTERNET|CAMERA|ACCESS_NETWORK_STATE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE)/.test(permissions),'Unexpected network/camera/storage permission');
   console.log('Verified APK signatures, shared watch identity, version, launcher and offline permissions:',file);
 }
 module.exports={verifyApk};

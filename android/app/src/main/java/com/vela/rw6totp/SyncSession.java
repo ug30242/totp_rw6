@@ -6,7 +6,7 @@ import org.json.JSONObject;
 
 /** One acknowledged account at a time. A send callback alone never means saved. */
 final class SyncSession {
-    interface Transport { void send(String packet); void openWatch(); }
+    interface Transport { void send(String packet, boolean probe); void openWatch(); }
     interface Events { void status(String text); void finished(boolean success); }
     interface Timer { void after(Runnable action, long millis); }
     private final Transport transport;
@@ -23,22 +23,22 @@ final class SyncSession {
         if (items.isEmpty() || items.size() > 50) { events.status("동기화할 계정을 먼저 추가하세요. 최대 50개입니다."); return; }
         epoch++; running = true; offset = 0; attempts = 0; accounts = new ArrayList<>(items);
         helloId = OtpAccount.requestId(); requestId = null;
-        events.status("워치 TOTP를 여는 중… 필요하면 워치에서 + Phone을 직접 여세요.");
-        transport.openWatch(); hello(epoch);
+        events.status("수신 확인 중…");
+        hello(epoch);
     }
     private void hello(int current) {
         if (!running || current != epoch || helloId == null) return;
-        if (++attempts > 15) { fail("워치 응답이 없습니다. TOTP > + Phone을 열고 다시 동기화하세요."); return; }
-        try { transport.send(new JSONObject().put("type", "rw6-totp-hello").put("version",1).put("id",helloId).toString()); }
+        if (++attempts > 15) { fail("워치 준비 응답 없음. TOTP > + Phone을 확인하세요."); return; }
+        // Leave an already open receiver intact. Launch only after unanswered probes.
+        if (attempts == 3) transport.openWatch();
+        try { transport.send(new JSONObject().put("type", "rw6-totp-hello").put("version",1).put("id",helloId).toString(),true); }
         catch (Exception e) { fail("연결 확인 실패. 다시 연결하세요."); return; }
         timer.after(() -> hello(current), 1000);
     }
     void receive(String raw) {
         if (!running || raw == null || raw.length() > 2048) return;
         try {
-            JSONObject packet = new JSONObject(raw);
-            // Vela's send(Object) arrives as UTF-8 JSON; our payload is in data.
-            if (!packet.has("type") && packet.opt("data") instanceof String) packet = new JSONObject(packet.getString("data"));
+            JSONObject packet = decode(raw);
             if (packet.optInt("version") != 1) return;
             String type = packet.optString("type"), id = packet.optString("id");
             if ("rw6-totp-ready".equals(type) && helloId != null && helloId.equals(id)) {
@@ -68,14 +68,28 @@ final class SyncSession {
             requestId = OtpAccount.requestId();
             String id = requestId; int current = epoch;
             String packet = accounts.get(offset).packet(id);
-            events.status("동기화 중 " + (offset + 1) + " / " + accounts.size() + "…");
-            transport.send(packet);
+            events.status("동기화 " + (offset + 1) + "/" + accounts.size());
+            transport.send(packet,false);
             timer.after(() -> {
                 if (running && current == epoch && id.equals(requestId)) fail("저장 응답 시간 초과. 워치 목록을 확인한 후 다시 동기화하세요. 같은 계정은 중복 추가하지 않습니다.");
             }, 15000);
         } catch (Exception e) { fail("동기화 준비 실패. 계정 설정을 확인하세요."); }
     }
     void fail(String text) { if (!running) return; clear(); events.status(text); events.finished(false); }
+    private JSONObject decode(String raw) throws Exception {
+        Object value=raw;
+        for(int depth=0;depth<6;depth++) {
+            if(value instanceof String) {
+                String text=(String)value;if(text.length()>2048)throw new IllegalArgumentException();
+                value=new org.json.JSONTokener(text).nextValue();continue;
+            }
+            if(!(value instanceof JSONObject))break;
+            JSONObject object=(JSONObject)value;
+            if(object.has("type"))return object;
+            value=object.opt("data");
+        }
+        throw new IllegalArgumentException();
+    }
     void cancel() { if (running) { clear(); events.finished(false); } }
     private void clear() { epoch++; running = false; helloId = null; requestId = null; accounts.clear(); }
 }

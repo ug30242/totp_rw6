@@ -12,7 +12,7 @@ public class SyncSessionTest {
         final List<Runnable> timers=new ArrayList<>();
         final SyncSession session=new SyncSession(this,this,this);
         int opened,successes,failures;
-        @Override public void send(String packet){sent.add(packet);}
+        @Override public void send(String packet,boolean probe){sent.add(packet);}
         @Override public void openWatch(){opened++;}
         @Override public void status(String text){statuses.add(text);}
         @Override public void finished(boolean success){if(success)successes++;else failures++;}
@@ -27,12 +27,12 @@ public class SyncSessionTest {
     private OtpAccount a(String name){return OtpAccount.direct(name,"JBSWY3DPEHPK3PXP","SHA1","6","30");}
     @Test public void opensWatchHandshakesThenWaitsForEachPersistentAck() throws Exception{
         Fixture f=new Fixture();f.session.start(List.of(a("one"),a("two")));
-        assertEquals(1,f.opened);assertEquals("rw6-totp-hello",f.last().getString("type"));
+        assertEquals(0,f.opened);assertEquals("rw6-totp-hello",f.last().getString("type"));
         assertFalse(f.sent.get(0).contains("secret"));
         f.ready();assertEquals("one",f.last().getJSONObject("account").getString("name"));
         assertEquals(0,f.successes);assertEquals(2,f.sent.size());
         f.saved();assertEquals("two",f.last().getJSONObject("account").getString("name"));
-        f.saved();assertEquals(1,f.successes);assertFalse(f.session.isRunning());
+        f.saved();assertEquals(1,f.successes);assertFalse(f.session.isRunning());assertEquals(0,f.opened);
         for(Runnable timeout:new ArrayList<>(f.timers))timeout.run();assertEquals(0,f.failures);
     }
     @Test public void ignoresWrongIdsVersionsAndDuplicateAcks() throws Exception{
@@ -64,7 +64,7 @@ public class SyncSessionTest {
     }
     @Test public void rejectsEmptyListsAndDoesNotStartTwice(){
         Fixture f=new Fixture();f.session.start(List.of());assertEquals(0,f.opened);
-        f.session.start(List.of(a("one")));f.session.start(List.of(a("two")));assertEquals(1,f.opened);
+        f.session.start(List.of(a("one")));f.session.start(List.of(a("two")));assertEquals(1,f.sent.size());
     }
     @Test public void acceptsTheActualVelaObjectEnvelope() throws Exception{
         Fixture f=new Fixture();f.session.start(List.of(a("one")));
@@ -73,5 +73,19 @@ public class SyncSessionTest {
         assertEquals("rw6-totp-sync",f.last().getString("type"));
         JSONObject saved=new JSONObject().put("type","rw6-totp-result").put("version",1).put("id",f.last().getString("id")).put("status","saved");
         f.session.receive(new JSONObject().put("data",saved.toString()).toString());assertEquals(1,f.successes);
+    }
+    @Test public void launchesOnlyAfterCurrentReceiverDoesNotAnswer() throws Exception{
+        Fixture f=new Fixture();f.session.start(List.of(a("one")));
+        assertEquals(0,f.opened);f.timers.get(0).run();assertEquals(0,f.opened);
+        f.timers.get(1).run();assertEquals(1,f.opened);f.ready();f.saved();assertEquals(1,f.successes);
+    }
+    @Test public void acceptsNestedObjectAndJsonStringEnvelopes() throws Exception{
+        for(int variant=0;variant<3;variant++){
+            Fixture f=new Fixture();f.session.start(List.of(a("one")));
+            JSONObject packet=new JSONObject().put("type","rw6-totp-ready").put("version",1).put("id",f.last().getString("id"));
+            String raw=variant==0?new JSONObject().put("data",packet).toString():variant==1
+                ?new JSONObject().put("data",new JSONObject().put("data",packet.toString())).toString():JSONObject.quote(packet.toString());
+            f.session.receive(raw);assertEquals("rw6-totp-sync",f.last().getString("type"));f.saved();assertEquals(1,f.successes);
+        }
     }
 }

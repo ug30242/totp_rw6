@@ -502,62 +502,10 @@ function decryptPayload(packetStr, secretKeyStr) {
   return JSON.parse(bytesToUtf8(plainBytes));
 }
 
-function parseOtpAuthUri(uriStr) {
-  const raw = String(uriStr || '').trim();
-  if (!raw.toLowerCase().startsWith('otpauth://')) {
-    throw new Error('Expected an otpauth:// URI.');
-  }
-  // URL/URLSearchParams are not available on all Vela JS runtimes.
-  const match = /^otpauth:\/\/([^/]+)\/([^?]*)\?([^#]*)(?:#.*)?$/i.exec(raw);
-  if (!match) throw new Error('Invalid OTP URI.');
-  const type = match[1].toLowerCase();
-  if (type !== 'totp') {
-    throw new Error('Only TOTP URIs are supported.');
-  }
-  const labelPath = decodeURIComponent(match[2]);
-  const values = Object.create(null);
-  match[3].split('&').forEach(pair => {
-    const at = pair.indexOf('=');
-    const key = decodeURIComponent(at < 0 ? pair : pair.slice(0, at));
-    const value = decodeURIComponent((at < 0 ? '' : pair.slice(at + 1)).replace(/\+/g, ' '));
-    if (Object.prototype.hasOwnProperty.call(values, key)) throw new Error('Duplicate OTP parameter.');
-    values[key] = value;
-  });
-  const params = {get: key => values[key]};
-  const secret = (params.get('secret') || '').toUpperCase().replace(/[\s-]+/g, '').replace(/=+$/, '');
-  if (!secret) {
-    throw new Error('OTP URI is missing its secret.');
-  }
-  base32ToBytes(secret); // validate Base32
-
-  let issuer = params.get('issuer') || '';
-  let accountName = labelPath;
-  if (labelPath.includes(':')) {
-    const splitIdx = labelPath.indexOf(':');
-    const prefix = labelPath.slice(0, splitIdx).trim();
-    accountName = labelPath.slice(splitIdx + 1).trim();
-    if (!issuer) issuer = prefix;
-  }
-  const displayName = issuer && accountName && !accountName.toLowerCase().startsWith(issuer.toLowerCase())
-    ? `${issuer} (${accountName})`
-    : (accountName || issuer || 'New account');
-
-  const rawAlgo = (params.get('algorithm') || 'SHA1').toUpperCase().replace('-', '');
-  const account = normalizeAccount({
-    name: displayName,
-    secret,
-    algorithm:rawAlgo,
-    digits:params.get('digits') === undefined ? 6 : params.get('digits'),
-    period:params.get('period') === undefined ? 30 : params.get('period')
-  });
-  return {...account, issuer:issuer || ''};
-}
-
 export {
   base32ToBytes,
   normalizeAccount,
   generateTOTP,
   encryptPayload,
-  decryptPayload,
-  parseOtpAuthUri
+  decryptPayload
 };

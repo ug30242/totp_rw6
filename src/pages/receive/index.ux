@@ -26,7 +26,7 @@
 import router from '@system.router';
 import interconnect from '@system.interconnect';
 import { syncPhoneAccounts } from '../../common/storage';
-import { createPhoneImporter } from '../../common/phone-import';
+import { openPhoneChannel } from '../../common/phone-channel';
 
 export default {
   private: {
@@ -34,6 +34,7 @@ export default {
     pending:false, busy:false, accountName:'', algorithm:'SHA1', digits:6, period:30
   },
   onShow() {
+    if (this._channel) this._channel.close();
     this._visible = true;
     this.pending = false; this.busy = false; this.accountName = ''; this.statusText = 'Waiting for phone sync.';
     try { this._connect = interconnect.instance(); }
@@ -41,50 +42,27 @@ export default {
       this._connect = null; this.connectionText = 'Phone sync unavailable.';
       this.statusText = 'Use + Key on the home screen.'; return;
     }
-    this._receiver = createPhoneImporter({
+    this._channel = openPhoneChannel(this._connect, {
       save:syncPhoneAccounts,
-      send:data => this._connect.send({data:{data}, fail:() => {}}),
+      connection:text => { this.connectionText = text; },
+      delivery:text => { if (!this.busy) this.statusText = text; },
       update:state => {
         this.pending = state.pending; this.busy = state.busy;
         this.statusText = state.status; this.accountName = state.name;
         this.algorithm = state.algorithm; this.digits = state.digits; this.period = state.period;
       }
     });
-    this._connect.onmessage = event => {
-      if (!this._visible || !event) return;
-      try {
-        const message = JSON.parse(event.data);
-        if (message.type === 'rw6-totp-hello' && message.version === 1 && /^[a-f0-9]{32}$/.test(message.id)) {
-          this._connect.send({data:{data:JSON.stringify({type:'rw6-totp-ready', version:1, id:message.id})}, fail:() => {}});
-          return;
-        }
-      } catch (_) {}
-      return this._receiver.receive(event.data);
-    };
-    this._connect.onopen = () => { if (this._visible) this.connectionText = 'Phone connected.'; };
-    this._connect.onclose = () => { if (this._visible) this.connectionText = 'Phone disconnected. Reconnect.'; };
-    this._connect.onerror = event => { if (this._visible) this.connectionText = event.code === 1001
-      ? 'Install RW6 TOTP on Android.' : 'Cannot connect. Check Mi Fitness.'; };
     this.checkConnection();
   },
   onHide() { this.stopReceiving(); },
   onDestroy() { this.stopReceiving(); },
   checkConnection() {
-    if (!this._connect) return;
-    this._connect.getReadyState({
-      success:data => { if (this._visible) this.connectionText = data.status === 1
-        ? 'Phone connected.' : 'Open Android app and Mi Fitness.'; },
-      fail:() => { if (this._visible) this.connectionText = 'Cannot connect. Check Mi Fitness.'; }
-    });
+    if (this._channel) this._channel.check();
   },
   stopReceiving() {
     this._visible = false;
-    if (this._receiver) this._receiver.close();
-    this._receiver = null;
-    if (this._connect) {
-      this._connect.onmessage = () => {}; this._connect.onopen = () => {};
-      this._connect.onclose = () => {}; this._connect.onerror = () => {};
-    }
+    if (this._channel) this._channel.close();
+    this._channel = null;
     this.pending = false; this.accountName = '';
   },
   goBack() { if (!this.busy) { this.stopReceiving(); router.back(); } }

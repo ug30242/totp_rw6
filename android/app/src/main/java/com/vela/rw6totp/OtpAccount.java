@@ -1,15 +1,10 @@
 package com.vela.rw6totp;
 
-import java.net.URI;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 import org.json.JSONObject;
 
-/** Strict local TOTP URI parser. Never opens or resolves a scanned URI. */
+/** Validated local account data; no scanner, URI importer or network access. */
 final class OtpAccount {
     final String name, secret, algorithm, syncId;
     final int digits, period;
@@ -19,47 +14,6 @@ final class OtpAccount {
     private OtpAccount(String name,String secret,String algorithm,int digits,int period,String syncId) {
         this.name = name; this.secret = secret; this.algorithm = algorithm; this.digits = digits; this.period = period;
         this.syncId = syncId;
-    }
-    static OtpAccount parse(String raw) {
-        try {
-            if (raw == null || raw.length() > 4096) throw new IllegalArgumentException();
-            URI uri = new URI(raw.trim());
-            if (!"otpauth".equalsIgnoreCase(uri.getScheme()) || !"totp".equalsIgnoreCase(uri.getRawAuthority()) ||
-                    uri.getFragment() != null || uri.getRawPath() == null || !uri.getRawPath().startsWith("/")) {
-                throw new IllegalArgumentException();
-            }
-            Map<String,String> params = new HashMap<>();
-            String query = uri.getRawQuery();
-            if (query == null) throw new IllegalArgumentException();
-            for (String part : query.split("&")) {
-                String[] pair = part.split("=", 2);
-                String key = decode(pair[0]);
-                if (params.containsKey(key)) throw new IllegalArgumentException();
-                params.put(key, pair.length == 2 ? decode(pair[1]) : "");
-            }
-            String secret = params.getOrDefault("secret", "").replaceAll("\\s", "").toUpperCase(Locale.ROOT);
-            validateBase32(secret);
-            secret = secret.replaceAll("=+$", "");
-            String algorithm = params.getOrDefault("algorithm", "SHA1").toUpperCase(Locale.ROOT);
-            if (!algorithm.matches("SHA1|SHA256|SHA512")) throw new IllegalArgumentException();
-            String digitsText = params.getOrDefault("digits", "6");
-            String periodText = params.getOrDefault("period", "30");
-            if (!digitsText.matches("6|8") || !periodText.matches("[0-9]{1,4}")) throw new IllegalArgumentException();
-            int period = Integer.parseInt(periodText);
-            if (period < 5 || period > 3600) throw new IllegalArgumentException();
-            String name = decode(uri.getRawPath().substring(1).replace("+", "%2B"));
-            String issuer = params.getOrDefault("issuer", "");
-            if (name.isEmpty()) name = issuer.isEmpty() ? "New account" : issuer;
-            if (!issuer.isEmpty() && !name.startsWith(issuer + ":")) name = issuer + ":" + name;
-            if (name.length() > 64 || name.matches("(?s).*[\\x00-\\x1f\\x7f].*")) throw new IllegalArgumentException();
-            return new OtpAccount(name, secret, algorithm, Integer.parseInt(digitsText), period);
-        } catch (Exception e) {
-            // Do not include the scanned data or secret in errors/logs.
-            throw new IllegalArgumentException("유효한 TOTP 계정 QR/URI가 아닙니다. SHA1/256/512, 6/8자리, 5~3600초를 지원합니다.");
-        }
-    }
-    private static String decode(String text) throws Exception {
-        return URLDecoder.decode(text, StandardCharsets.UTF_8.name());
     }
     private static void validateBase32(String secret) {
         if (secret.isEmpty() || secret.length() > 256 || !secret.matches("[A-Z2-7]+=*")) throw new IllegalArgumentException();
@@ -78,16 +32,17 @@ final class OtpAccount {
         for (byte b : bytes) result.append(String.format(Locale.ROOT, "%02x", b & 255));
         return result.toString();
     }
-    static OtpAccount direct(String name, String secret, String algorithm, String digits, String period) {
+    static OtpAccount direct(String name,String secret,String algorithm,String digits,String periodText) {
         try {
-            String label = name.trim().isEmpty() ? "New account" : name.trim();
-            String uri = "otpauth://totp/" + java.net.URLEncoder.encode(label, "UTF-8").replace("+", "%20")
-                + "?secret=" + java.net.URLEncoder.encode(secret, "UTF-8")
-                + "&algorithm=" + java.net.URLEncoder.encode(algorithm, "UTF-8")
-                + "&digits=" + java.net.URLEncoder.encode(digits, "UTF-8")
-                + "&period=" + java.net.URLEncoder.encode(period, "UTF-8");
-            return parse(uri);
-        } catch (Exception e) { throw new IllegalArgumentException("이름, Base32 인증키와 TOTP 설정을 확인하세요."); }
+            String label=name.trim().isEmpty()?"New account":name.trim();
+            if(label.length()>64 || label.matches("(?s).*[\\x00-\\x1f\\x7f].*"))throw new IllegalArgumentException();
+            String normalized=secret.replaceAll("[\\s-]+", "").toUpperCase(Locale.ROOT);
+            validateBase32(normalized);normalized=normalized.replaceAll("=+$", "");
+            String hash=algorithm.toUpperCase(Locale.ROOT).replace("-", "");
+            if(!hash.matches("SHA1|SHA256|SHA512") || !digits.matches("6|8") || !periodText.matches("[0-9]{1,4}"))throw new IllegalArgumentException();
+            int period=Integer.parseInt(periodText);if(period<5 || period>3600)throw new IllegalArgumentException();
+            return new OtpAccount(label,normalized,hash,Integer.parseInt(digits),period);
+        } catch(Exception e) { throw new IllegalArgumentException("이름, 인증키와 TOTP 설정을 확인하세요."); }
     }
     JSONObject toJson() throws Exception {
         return new JSONObject().put("name", name).put("secret", secret)

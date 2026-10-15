@@ -186,7 +186,7 @@ final class XmsClient {
             } catch (Exception ignored) { /* SyncSession times out with the manual-open instruction. */ }
         });
     }
-    void send(String json, Runnable sent) {
+    void send(String json, boolean probe) {
         if (!ready) { events.error("워치를 먼저 연결하세요."); return; }
         final int epoch = generation;
         final IWearableInterface remote = service;
@@ -198,11 +198,10 @@ final class XmsClient {
                 if(epoch != generation)return;
                 remote.sendMessage(id, bytes, new IMessageCallback.Stub() {
                     @Override public void onMessageSent(Status status) {
-                        if (status != null && status.isSuccess()) post(epoch, sent);
-                        else fail(epoch, explain(status));
+                        if (!probe && (status == null || !status.isSuccess())) fail(epoch, explain(status));
                     }
                 });
-            } catch (Exception e) { fail(epoch, "전송하지 못했습니다. 다시 연결한 뒤 동기화하세요."); }
+            } catch (Exception e) { if (!probe) fail(epoch, "전송 실패. 다시 동기화하세요."); }
             finally { java.util.Arrays.fill(bytes, (byte) 0); }
         });
     }

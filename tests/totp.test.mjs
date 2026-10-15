@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac, randomBytes} from 'node:crypto';
-import {base32ToBytes, generateTOTP, normalizeAccount, parseOtpAuthUri, encryptPayload, decryptPayload} from '../src/common/totp.js';
+import {base32ToBytes, generateTOTP, normalizeAccount, encryptPayload, decryptPayload} from '../src/common/totp.js';
 function base32(bytes) {
   let bits=0, value=0, out=''; const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   for (const b of bytes) { value=(value<<8)|b; bits+=8; while(bits>=5) { bits-=5; out+=chars[(value>>>bits)&31]; } }
@@ -39,15 +39,6 @@ test('time boundary and strict account validation',()=>{
   }
   assert.throws(()=>generateTOTP(a,-1));
   assert.deepEqual([...base32ToBytes('my======')],[102]);
-});
-test('OTP URI parser works without URL APIs and rejects ambiguous/unsupported fields',()=>{
-  const old=globalThis.URL; globalThis.URL=undefined;
-  try {
-    const a=parseOtpAuthUri('otpauth://totp/Example%3Aalice%40mail?secret=JBSWY3DPEHPK3PXP&issuer=Example&algorithm=SHA-256&digits=8&period=60');
-    assert.equal(a.name,'Example (alice@mail)');assert.equal(a.algorithm,'SHA256');assert.equal(a.period,60);
-  } finally { globalThis.URL=old; }
-  for(const uri of ['otpauth://hotp/a?secret=MY','otpauth://totp/a?secret=MY&secret=MY','otpauth://totp/a?secret=MY&digits=7','otpauth://totp/a?secret=MY&period=Infinity','otpauth://totp/a?secret=MY&algorithm=MD5','otpauth://totp/a?secret=MY&period=']) assert.throws(()=>parseOtpAuthUri(uri));
-  assert.throws(()=>parseOtpAuthUri('otpauth://totp/a?secret=JBS=WY3DPEHPK3PXP'));
 });
 test('encrypted Unicode round-trip, unique nonces, authentication and framing',()=>{
   const payload={sid:'RW6EXAMPLE',accounts:[{name:'한글 🔒',secret:'MY'}]};
